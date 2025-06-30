@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Literal, Optional, List, Dict, Any
 
 from pydantic import BaseModel
 
@@ -79,3 +79,13 @@ class PageExtractionAction(_BaseExtra):
 
 	type: Literal['extract_page_content']
 	goal: str
+
+
+class DOMExtractionAction(RecorderBase):
+	"""Parameters for extracting DOM content using natural language rules."""
+
+	type: Literal['extract_dom_content']
+	selectors: List[Dict[str, Any]]  # Array of selector configs with priorities
+	extractionRule: str              # Natural language extraction rule
+	multiple: bool = False           # Whether to extract multiple items
+	htmlSample: str                  # HTML sample for context

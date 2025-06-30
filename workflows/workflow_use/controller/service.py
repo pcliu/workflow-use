@@ -14,6 +14,7 @@ from workflow_use.controller.views import (
 	KeyPressDeterministicAction,
 	NavigationAction,
 	PageExtractionAction,
+	DOMExtractionAction,
 	ScrollDeterministicAction,
 	SelectDropdownOptionDeterministicAction,
 )
@@ -239,3 +240,114 @@ class WorkflowController(Controller):
 				msg = f'📄  Extracted from page\n: {content}\n'
 				logger.info(msg)
 				return ActionResult(extracted_content=msg)
+
+		# DOM Content Extraction --------------------------------------------------------
+		@self.registry.action(
+			'Extract specific DOM content using CSS selectors and XPath with intelligent parsing',
+			param_model=DOMExtractionAction,
+		)
+		async def extract_dom_content(
+			params: DOMExtractionAction, 
+			browser_session: Browser, 
+			page_extraction_llm: BaseChatModel
+		) -> ActionResult:
+			"""Extract content from DOM elements using selectors with fallback strategies."""
+			page = await browser_session.get_current_page()
+			
+			try:
+				extracted_data = await self._extract_dom_elements(page, params, page_extraction_llm)
+				
+				msg = f'🎯  Extracted DOM content: {extracted_data}'
+				logger.info(msg)
+				return ActionResult(extracted_content=extracted_data, include_in_memory=True)
+				
+			except Exception as e:
+				error_msg = f'Failed to extract DOM content: {str(e)}'
+				logger.error(error_msg)
+				raise Exception(error_msg)
+
+		async def _extract_dom_elements(self, page, params: DOMExtractionAction, llm: BaseChatModel):
+			"""Core DOM extraction logic with selector fallback and intelligent parsing."""
+			results = []
+			
+			# Try selectors in priority order
+			element_found = False
+			for selector_config in params.selectors:
+				try:
+					selector_type = selector_config.get('type')
+					selector_value = selector_config.get('value')
+					
+					if selector_type == 'css':
+						elements = await page.query_selector_all(selector_value)
+					elif selector_type == 'xpath':
+						elements = await page.query_selector_all(f'xpath={selector_value}')
+					else:
+						continue
+					
+					if elements:
+						element_found = True
+						logger.info(f'Found {len(elements)} elements with {selector_type}: {selector_value}')
+						
+						# Extract content based on configuration
+						for element in elements:
+							content = await self._extract_element_content(element)
+							results.append(content)
+						
+						# If not multiple mode, take first result
+						if not params.multiple:
+							results = results[:1]
+						break
+						
+				except Exception as e:
+					logger.warning(f'Selector {selector_type}:{selector_value} failed: {e}')
+					continue
+			
+			if not element_found:
+				raise Exception("No elements found with any of the provided selectors")
+			
+			# Use LLM to parse content according to natural language rule
+			if params.extractionRule and any(len(str(result)) > 50 for result in results):
+				return await self._parse_complex_content(results, params.extractionRule, llm)
+			
+			return results[0] if len(results) == 1 else results
+
+		async def _extract_element_content(self, element):
+			"""Extract content from a single element - returns both text and HTML for LLM processing."""
+			# For intelligent extraction, always get the full HTML content
+			# The LLM will determine what to extract based on the natural language rule
+			return await element.inner_html()
+
+		async def _parse_complex_content(self, html_contents, goal, llm):
+			"""Use LLM to parse complex HTML structure and extract structured data."""
+			combined_html = '\n'.join(str(content) for content in html_contents)
+			
+			prompt = """
+You are tasked with extracting structured information from HTML content.
+
+HTML Content:
+{html_content}
+
+Extraction Goal: {goal}
+
+Please extract the relevant information and return it as structured JSON. 
+Focus on extracting:
+- Individual fields (scores, dates, text content)
+- Maintain structure and relationships
+- Remove HTML tags but preserve meaningful content
+
+Return only the JSON data, no explanation.
+"""
+			
+			template = PromptTemplate(input_variables=['html_content', 'goal'], template=prompt)
+			
+			try:
+				response = await llm.ainvoke(template.format(html_content=combined_html, goal=goal))
+				# Try to parse as JSON, fall back to text if parsing fails
+				import json
+				try:
+					return json.loads(response.content)
+				except:
+					return response.content
+			except Exception as e:
+				logger.warning(f'LLM parsing failed: {e}')
+				return html_contents

@@ -76,13 +76,35 @@ export interface StoredRrwebEvent {
   messageType: "RRWEB_EVENT";
 }
 
+export interface StoredCustomExtractionMarkedEvent {
+  timestamp: number;
+  url: string;
+  frameUrl: string;
+  xpath: string;
+  cssSelector: string;
+  elementTag: string;
+  elementText: string;
+  extractionRule: string;
+  multiple: boolean;
+  htmlSample: string;
+  selectors: Array<{
+    type: string;
+    value: string;
+    priority: number;
+  }>;
+  tabId: number;
+  messageType: "CUSTOM_EXTRACTION_MARKED_EVENT";
+  screenshot?: string;
+}
+
 export type StoredEvent =
   | StoredCustomClickEvent
   | StoredCustomInputEvent
   | StoredCustomSelectEvent
   | StoredCustomKeyEvent
   | StoredTabEvent
-  | StoredRrwebEvent;
+  | StoredRrwebEvent
+  | StoredCustomExtractionMarkedEvent;
 
 // --- Data Structures ---
 

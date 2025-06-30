@@ -24,6 +24,24 @@ export interface HttpRecordingStoppedEvent {
   };
 }
 
+export interface HttpContentMarkingEvent {
+  type: "MARK_CONTENT_FOR_EXTRACTION";
+  timestamp: number;
+  payload: {
+    url: string;
+    frameUrl: string;
+    xpath: string;
+    cssSelector: string;
+    elementTag: string;
+    elementText: string;
+    extractConfig: {
+      extractionRule: string;
+      multiple: boolean;
+      htmlSample: string;
+    };
+  };
+}
+
 // If you plan to send other types of events, like TERMINATE_COMMAND, define them here too
 // export interface HttpTerminateCommandEvent {
 //   type: "TERMINATE_COMMAND";
@@ -36,5 +54,6 @@ export interface HttpRecordingStoppedEvent {
 export type HttpEvent =
   | HttpWorkflowUpdateEvent
   | HttpRecordingStartedEvent
-  | HttpRecordingStoppedEvent;
+  | HttpRecordingStoppedEvent
+  | HttpContentMarkingEvent;
 // | HttpTerminateCommandEvent; // Add other event types to the union if defined

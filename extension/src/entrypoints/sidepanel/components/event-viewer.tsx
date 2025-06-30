@@ -5,6 +5,7 @@ import {
   KeyPressStep,
   NavigationStep,
   ScrollStep,
+  ExtractionMarkedStep,
   Step,
 } from "../../../lib/workflow-types"; // Adjust path as needed
 import { useWorkflow } from "../context/workflow-provider";
@@ -25,7 +26,7 @@ const StepCard: React.FC<{
   onSelect: () => void;
 }> = ({ step, index, isSelected, onSelect }) => {
   const screenshot = getScreenshot(step);
-  const canShowScreenshot = ["click", "input", "key_press"].includes(step.type);
+  const canShowScreenshot = ["click", "input", "key_press", "extract_content_marked"].includes(step.type);
 
   // --- Step Summary Renderer (Top part of the card) ---
   const renderStepSummary = (step: Step) => {
@@ -80,6 +81,18 @@ const StepCard: React.FC<{
             <span className="text-lg">↕️</span>
             <span className="truncate">
               Scroll to ({s.scrollX}, {s.scrollY})
+            </span>
+          </div>
+        );
+      }
+      case "extract_content_marked": {
+        const s = step as ExtractionMarkedStep;
+        return (
+          <div className="flex items-center space-x-2">
+            <span className="text-lg">🎯</span>
+            <span className="truncate">
+              Extract content from <strong>{s.elementTag}</strong>
+              {s.extractionRule && `: "${s.extractionRule.substring(0, 50)}${s.extractionRule.length > 50 ? '...' : ''}"`}
             </span>
           </div>
         );
@@ -174,6 +187,44 @@ const StepCard: React.FC<{
             <p>
               <strong>Scroll Y:</strong> {s.scrollY}
             </p>
+          </>
+        );
+        break;
+      }
+      case "extract_content_marked": {
+        const s = step as ExtractionMarkedStep;
+        specificInfo = (
+          <>
+            {s.frameUrl && s.frameUrl !== s.url && (
+              <p>
+                <strong>Frame URL:</strong> {s.frameUrl}
+              </p>
+            )}
+            <p>
+              <strong>XPath:</strong> {s.xpath}
+            </p>
+            <p>
+              <strong>CSS:</strong> {s.cssSelector}
+            </p>
+            <p>
+              <strong>Element:</strong> {s.elementTag}
+            </p>
+            <p>
+              <strong>Extraction Rule:</strong> {s.extractionRule}
+            </p>
+            <p>
+              <strong>Multiple Items:</strong> {s.multiple ? 'Yes' : 'No'}
+            </p>
+            {s.selectors && s.selectors.length > 0 && (
+              <p>
+                <strong>Selectors:</strong> {s.selectors.length} generated
+              </p>
+            )}
+            {s.htmlSample && (
+              <p>
+                <strong>HTML Sample:</strong> {s.htmlSample.substring(0, 100)}...
+              </p>
+            )}
           </>
         );
         break;

@@ -6,6 +6,7 @@ import {
   StoredCustomKeyEvent,
   StoredEvent,
   StoredRrwebEvent,
+  StoredCustomExtractionMarkedEvent,
 } from "../lib/types";
 import {
   ClickStep,
@@ -13,6 +14,7 @@ import {
   KeyPressStep,
   NavigationStep,
   ScrollStep,
+  ExtractionMarkedStep,
   Step,
   Workflow,
 } from "../lib/workflow-types";
@@ -21,6 +23,7 @@ import {
   HttpRecordingStartedEvent,
   HttpRecordingStoppedEvent,
   HttpWorkflowUpdateEvent,
+  HttpContentMarkingEvent,
 } from "../lib/message-bus-types";
 
 export default defineBackground(() => {
@@ -31,6 +34,7 @@ export default defineBackground(() => {
   const tabInfo: { [tabId: number]: { url?: string; title?: string } } = {};
 
   let isRecordingEnabled = true; // Default to disabled (OFF)
+  let isContentMarkingEnabled = false; // Content marking mode state
   let lastWorkflowHash: string | null = null; // Cache for the last logged workflow hash
 
   const PYTHON_SERVER_ENDPOINT = "http://127.0.0.1:7331/event";
@@ -133,6 +137,34 @@ export default defineBackground(() => {
       })
       .catch((err) => {
         // console.debug("Could not send status update to sidepanel (might be closed)", err.message);
+      });
+  }
+
+  // Function to broadcast content marking status to all content scripts and sidepanel
+  function broadcastContentMarkingStatus() {
+    // Broadcast to Tabs
+    chrome.tabs.query({}, (tabs) => {
+      tabs.forEach((tab) => {
+        if (tab.id) {
+          chrome.tabs
+            .sendMessage(tab.id, {
+              type: "SET_CONTENT_MARKING_STATUS",
+              payload: isContentMarkingEnabled,
+            })
+            .catch((err: Error) => {
+              // Optional: Log if sending to a specific tab failed
+            });
+        }
+      });
+    });
+    // Broadcast to Sidepanel (using runtime message)
+    chrome.runtime
+      .sendMessage({
+        type: "content_marking_status_updated",
+        payload: { enabled: isContentMarkingEnabled },
+      })
+      .catch((err) => {
+        // console.debug("Could not send content marking status update to sidepanel", err.message);
       });
   }
 
@@ -316,6 +348,37 @@ export default defineBackground(() => {
           break;
         }
 
+        case "CUSTOM_EXTRACTION_MARKED_EVENT": {
+          const extractionEvent = event as StoredCustomExtractionMarkedEvent;
+          if (
+            extractionEvent.url &&
+            extractionEvent.frameUrl &&
+            extractionEvent.xpath &&
+            extractionEvent.extractionRule
+          ) {
+            const step: ExtractionMarkedStep = {
+              type: "extract_content_marked",
+              timestamp: extractionEvent.timestamp,
+              tabId: extractionEvent.tabId,
+              url: extractionEvent.url,
+              frameUrl: extractionEvent.frameUrl,
+              xpath: extractionEvent.xpath,
+              cssSelector: extractionEvent.cssSelector,
+              elementTag: extractionEvent.elementTag,
+              elementText: extractionEvent.elementText,
+              extractionRule: extractionEvent.extractionRule,
+              multiple: extractionEvent.multiple,
+              htmlSample: extractionEvent.htmlSample,
+              selectors: extractionEvent.selectors,
+              screenshot: extractionEvent.screenshot,
+            };
+            steps.push(step);
+          } else {
+            console.warn("Skipping incomplete CUSTOM_EXTRACTION_MARKED_EVENT:", extractionEvent);
+          }
+          break;
+        }
+
         case "RRWEB_EVENT": {
           // We only care about scroll events from rrweb for now
           const rrEvent = event as StoredRrwebEvent;
@@ -396,7 +459,24 @@ export default defineBackground(() => {
       "CUSTOM_INPUT_EVENT",
       "CUSTOM_SELECT_EVENT",
       "CUSTOM_KEY_EVENT",
+      "CUSTOM_EXTRACTION_MARKED_EVENT",
     ];
+    
+    // Handle DOM content marking events
+    if (message.type === "MARK_CONTENT_FOR_EXTRACTION") {
+      if (!isRecordingEnabled) {
+        return false; // Don't process if recording is disabled
+      }
+      
+      const eventToSend: HttpContentMarkingEvent = {
+        type: "MARK_CONTENT_FOR_EXTRACTION",
+        timestamp: Date.now(),
+        payload: message.payload,
+      };
+      sendEventToServer(eventToSend);
+      console.log("Forwarded content marking event to server:", message.payload);
+      return false;
+    }
     if (
       message.type === "RRWEB_EVENT" ||
       customEventTypes.includes(message.type)
@@ -513,6 +593,14 @@ export default defineBackground(() => {
       if (isRecordingEnabled) {
         isRecordingEnabled = false;
         console.log("Recording status set to: false");
+        
+        // Also disable content marking when recording stops
+        if (isContentMarkingEnabled) {
+          isContentMarkingEnabled = false;
+          console.log("Content marking disabled because recording stopped");
+          broadcastContentMarkingStatus();
+        }
+        
         broadcastRecordingStatus(); // Inform content scripts and sidepanel
 
         // Send recording stopped event to Python server
@@ -531,6 +619,17 @@ export default defineBackground(() => {
         `Sending initial status (${isRecordingEnabled}) to tab ${sender.tab.id}`
       );
       sendResponse({ isRecordingEnabled });
+    } else if (message.type === "TOGGLE_CONTENT_MARKING_REQUEST") {
+      console.log("Received TOGGLE_CONTENT_MARKING_REQUEST from sidepanel");
+      // Toggle the state in background
+      isContentMarkingEnabled = !isContentMarkingEnabled;
+      console.log("Content marking status set to:", isContentMarkingEnabled);
+      // Broadcast new status to all tabs and sidepanel
+      broadcastContentMarkingStatus();
+      sendResponse({ success: true, enabled: isContentMarkingEnabled });
+    } else if (message.type === "REQUEST_CONTENT_MARKING_STATUS" && sender.tab?.id) {
+      console.log(`Sending initial content marking status (${isContentMarkingEnabled}) to tab ${sender.tab.id}`);
+      sendResponse({ isContentMarkingEnabled });
     }
 
     // --- Removed Handlers ---

@@ -13,7 +13,8 @@ export type Step =
   | ClickStep
   | InputStep
   | KeyPressStep
-  | ScrollStep;
+  | ScrollStep
+  | ExtractionMarkedStep;
 // Add other step types here as needed, e.g., SelectStep, TabCreatedStep etc.
 
 export interface BaseStep {
@@ -68,6 +69,25 @@ export interface ScrollStep extends BaseStep {
   scrollX: number;
   scrollY: number;
   // Note: url might be missing if scroll happens on initial load before meta event?
+}
+
+export interface ExtractionMarkedStep extends BaseStep {
+  type: "extract_content_marked";
+  url: string;
+  frameUrl: string;
+  xpath: string;
+  cssSelector: string;
+  elementTag: string;
+  elementText: string;
+  extractionRule: string;
+  multiple: boolean;
+  htmlSample: string;
+  selectors: Array<{
+    type: string;
+    value: string;
+    priority: number;
+  }>;
+  screenshot?: string; // Optional
 }
 
 // Potential future step types based on StoredEvent
