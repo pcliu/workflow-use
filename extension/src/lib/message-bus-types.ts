@@ -51,9 +51,16 @@ export interface HttpContentMarkingEvent {
 //   };
 // }
 
+export interface HttpCustomExtractionMarkedEvent {
+  type: "CUSTOM_EXTRACTION_MARKED_EVENT";
+  timestamp: number;
+  payload: any; // Contains extraction data from content script
+}
+
 export type HttpEvent =
   | HttpWorkflowUpdateEvent
   | HttpRecordingStartedEvent
   | HttpRecordingStoppedEvent
-  | HttpContentMarkingEvent;
+  | HttpContentMarkingEvent
+  | HttpCustomExtractionMarkedEvent;
 // | HttpTerminateCommandEvent; // Add other event types to the union if defined

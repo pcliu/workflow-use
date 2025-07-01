@@ -24,6 +24,7 @@ import {
   HttpRecordingStoppedEvent,
   HttpWorkflowUpdateEvent,
   HttpContentMarkingEvent,
+  HttpCustomExtractionMarkedEvent,
 } from "../lib/message-bus-types";
 
 export default defineBackground(() => {
@@ -487,6 +488,7 @@ export default defineBackground(() => {
   // --- Message Listener ---
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log(`[Background] Received message: ${message.type} from tab ${sender.tab?.id}`);
     let isAsync = false; // Flag to indicate if sendResponse will be called asynchronously
 
     // --- Event Listener from Content Scripts ---
@@ -513,6 +515,23 @@ export default defineBackground(() => {
       console.log("Forwarded content marking event to server:", message.payload);
       return false;
     }
+
+    // Handle custom extraction marked events - send directly to server
+    if (message.type === "CUSTOM_EXTRACTION_MARKED_EVENT") {
+      if (!isRecordingEnabled) {
+        return false; // Don't process if recording is disabled
+      }
+      
+      const eventToSend: HttpCustomExtractionMarkedEvent = {
+        type: "CUSTOM_EXTRACTION_MARKED_EVENT",
+        timestamp: Date.now(),
+        payload: message.payload,
+      };
+      sendEventToServer(eventToSend);
+      console.log("Forwarded custom extraction event to server:", message.payload);
+      // Continue processing to also store in sessionLogs
+    }
+
     if (
       message.type === "RRWEB_EVENT" ||
       customEventTypes.includes(message.type)
