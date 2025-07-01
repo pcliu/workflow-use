@@ -51,6 +51,16 @@ export default defineBackground(() => {
     return hashHex;
   }
 
+  // Helper function to get base URL (without hash/query params)
+  function getBaseUrl(url: string): string {
+    try {
+      const urlObj = new URL(url);
+      return `${urlObj.protocol}//${urlObj.host}${urlObj.pathname}`;
+    } catch {
+      return url; // Return original if invalid URL
+    }
+  }
+
   // Helper function to send data to the Python server
   async function sendEventToServer(eventData: HttpEvent) {
     try {
@@ -122,9 +132,9 @@ export default defineBackground(() => {
               type: "SET_RECORDING_STATUS",
               payload: isRecordingEnabled,
             })
-            .catch((err: Error) => {
+            .catch((_err: Error) => {
               // Optional: Log if sending to a specific tab failed (e.g., script not injected)
-              // console.debug(`Could not send status to tab ${tab.id}: ${err.message}`);
+              // console.debug(`Could not send status to tab ${tab.id}: ${_err.message}`);
             });
         }
       });
@@ -135,8 +145,8 @@ export default defineBackground(() => {
         type: "recording_status_updated",
         payload: { status: statusString }, // Send string status
       })
-      .catch((err) => {
-        // console.debug("Could not send status update to sidepanel (might be closed)", err.message);
+      .catch((_err) => {
+        // console.debug("Could not send status update to sidepanel (might be closed)", _err.message);
       });
   }
 
@@ -151,7 +161,7 @@ export default defineBackground(() => {
               type: "SET_CONTENT_MARKING_STATUS",
               payload: isContentMarkingEnabled,
             })
-            .catch((err: Error) => {
+            .catch((_err: Error) => {
               // Optional: Log if sending to a specific tab failed
             });
         }
@@ -163,8 +173,8 @@ export default defineBackground(() => {
         type: "content_marking_status_updated",
         payload: { enabled: isContentMarkingEnabled },
       })
-      .catch((err) => {
-        // console.debug("Could not send content marking status update to sidepanel", err.message);
+      .catch((_err) => {
+        // console.debug("Could not send content marking status update to sidepanel", _err.message);
       });
   }
 
@@ -207,8 +217,8 @@ export default defineBackground(() => {
   });
 
   chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-    // Filter for relevant changes (e.g., url or status complete)
-    if (changeInfo.url || changeInfo.status === "complete") {
+    // Filter for relevant changes - only actual URL changes, not status updates
+    if (changeInfo.url) {
       sendTabEvent("CUSTOM_TAB_UPDATED", {
         tabId: tabId,
         changeInfo: changeInfo, // includes URL, status, title etc.
@@ -217,6 +227,7 @@ export default defineBackground(() => {
         title: tab.title,
       });
     }
+    // Remove status === "complete" to reduce noise from page reloads/DOM changes
   });
 
   chrome.tabs.onActivated.addListener((activeInfo) => {
@@ -420,15 +431,40 @@ export default defineBackground(() => {
               steps.push(newStep);
             }
           } else if (rrEvent.type === EventType.Meta && rrEvent.data?.href) {
-            // Also handle rrweb meta events as navigation
+            // Be much more conservative about Meta events -> Navigation
+            // Only treat as navigation if URL actually changed significantly
             const metaData = rrEvent.data as { href: string };
-            const step: NavigationStep = {
-              type: "navigation",
-              timestamp: rrEvent.timestamp,
-              tabId: rrEvent.tabId,
-              url: metaData.href,
-            };
-            steps.push(step);
+            const newUrl = metaData.href;
+            
+            // Find the most recent navigation step
+            let lastNavigationStep: NavigationStep | null = null;
+            for (let i = steps.length - 1; i >= 0; i--) {
+              if (steps[i].type === "navigation") {
+                lastNavigationStep = steps[i] as NavigationStep;
+                break;
+              }
+            }
+            
+            // Only create navigation if:
+            // 1. No previous navigation exists, OR
+            // 2. URL is genuinely different (not just hash/query changes), AND
+            // 3. Sufficient time has passed (not just DOM updates)
+            const isGenuineNavigation = !lastNavigationStep || 
+              (getBaseUrl(lastNavigationStep.url) !== getBaseUrl(newUrl) &&
+               (rrEvent.timestamp - lastNavigationStep.timestamp) > 1000); // At least 1 second
+            
+            if (isGenuineNavigation) {
+              const step: NavigationStep = {
+                type: "navigation",
+                timestamp: rrEvent.timestamp,
+                tabId: rrEvent.tabId,
+                url: newUrl,
+              };
+              steps.push(step);
+              console.log(`Created navigation step for URL change: ${lastNavigationStep?.url || 'none'} -> ${newUrl}`);
+            } else {
+              console.log(`Filtered Meta event (not genuine navigation): ${newUrl}`);
+            }
           }
           break;
         }

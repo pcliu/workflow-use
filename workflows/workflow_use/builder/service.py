@@ -109,6 +109,54 @@ class BuilderService:
 			None,
 		)
 
+	@staticmethod
+	def _filter_redundant_navigations(steps: List[Any]) -> List[Any]:
+		"""Filter out redundant navigation events that are likely side effects."""
+		filtered_steps = []
+		last_navigation_url = None
+		last_navigation_time = None
+		
+		for i, step in enumerate(steps):
+			step_dict = step.model_dump() if hasattr(step, 'model_dump') else step
+			step_type = step_dict.get('type')
+			
+			if step_type == 'navigation':
+				current_url = step_dict.get('url', '')
+				current_time = step_dict.get('timestamp', 0)
+				
+				# Check if this navigation is redundant
+				is_redundant = False
+				
+				# 1. Same URL as previous navigation within 5 seconds
+				if (last_navigation_url == current_url and 
+					last_navigation_time and 
+					(current_time - last_navigation_time) < 5000):
+					is_redundant = True
+					
+				# 2. Navigation immediately after user action (likely side effect)
+				if i > 0:
+					prev_step = steps[i-1]
+					prev_dict = prev_step.model_dump() if hasattr(prev_step, 'model_dump') else prev_step
+					prev_type = prev_dict.get('type')
+					prev_time = prev_dict.get('timestamp', 0)
+					
+					# If navigation happens within 2 seconds of click/submit/key_press
+					if (prev_type in ['click', 'key_press', 'select_change'] and
+						(current_time - prev_time) < 2000):
+						is_redundant = True
+				
+				if not is_redundant:
+					filtered_steps.append(step)
+					last_navigation_url = current_url
+					last_navigation_time = current_time
+				else:
+					logger.debug(f"Filtered redundant navigation to: {current_url}")
+			else:
+				filtered_steps.append(step)
+		
+		logger.info(f"Navigation filtering: {len(steps)} -> {len(filtered_steps)} steps")
+		return filtered_steps
+
 	def _parse_llm_output_to_workflow(self, llm_content: str) -> WorkflowDefinitionSchema:
 		"""Attempts to parse the LLM string output into a WorkflowDefinitionSchema."""
 		logger.debug(f'Raw LLM Output:\n{llm_content}')
@@ -164,6 +212,10 @@ class BuilderService:
 		# Validate input slightly
 		if not input_workflow or not isinstance(input_workflow.steps, list):
 			raise ValueError('Invalid input_workflow object provided.')
+
+		# Pre-filter redundant navigation events to reduce noise for LLM
+		filtered_steps = self._filter_redundant_navigations(input_workflow.steps)
+		input_workflow.steps = filtered_steps
 
 		# Handle user goal
 		goal = user_goal
