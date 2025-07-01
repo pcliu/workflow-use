@@ -95,6 +95,43 @@ class PageExtractionStep(TimestampedWorkflowStep):
 	goal: str = Field(..., description='The goal of the page extraction.')
 
 
+class DOMExtractionField(BaseModel):
+	"""Schema for individual fields to extract from DOM elements."""
+	name: str = Field(..., description='Field name for the extracted data.')
+	selector: str = Field(..., description='CSS selector for the specific field.')
+	type: Literal['text', 'href', 'src', 'attribute'] = Field('text', description='Type of data to extract.')
+	attribute: Optional[str] = Field(None, description='Attribute name if type is "attribute".')
+
+
+class DOMContentExtractionStep(TimestampedWorkflowStep):
+	"""Extracts structured content from DOM elements using refined selectors."""
+
+	type: Literal['extract_dom_content']
+	containerSelector: str = Field(..., description='CSS selector for the container element (or single element if not multiple).')
+	fields: List[DOMExtractionField] = Field(..., description='Array of fields to extract from each container.')
+	multiple: bool = Field(False, description='Whether to extract from multiple container elements.')
+	excludeSelectors: Optional[List[str]] = Field(None, description='CSS selectors for elements to exclude from extraction.')
+	extractionRule: Optional[str] = Field(None, description='Original natural language extraction rule (informational).')
+	htmlSample: Optional[str] = Field(None, description='Sample HTML for reference (informational).')
+
+
+class ExtractionMarkedStep(TimestampedWorkflowStep):
+	"""Intermediate step for marked content extraction that gets converted to extract_dom_content."""
+	
+	type: Literal['extract_content_marked']
+	url: Optional[str] = Field(None, description='Page URL where extraction was marked.')
+	frameUrl: Optional[str] = Field(None, description='Frame URL if in iframe.')
+	xpath: Optional[str] = Field(None, description='XPath selector for marked element.')
+	cssSelector: Optional[str] = Field(None, description='CSS selector for marked element.')
+	elementTag: Optional[str] = Field(None, description='HTML tag of marked element.')
+	elementText: Optional[str] = Field(None, description='Text content of marked element.')
+	extractionRule: Optional[str] = Field(None, description='Natural language extraction rule.')
+	multiple: Optional[bool] = Field(False, description='Whether to extract multiple items.')
+	htmlSample: Optional[str] = Field(None, description='HTML sample for LLM processing.')
+	selectors: Optional[List] = Field(None, description='Array of selector configurations.')
+	screenshot: Optional[str] = Field(None, description='Screenshot data URL.')
+
+
 # --- Union of all possible step types ---
 # This Union defines what constitutes a valid step in the "steps" list.
 DeterministicWorkflowStep = Union[
@@ -105,6 +142,8 @@ DeterministicWorkflowStep = Union[
 	KeyPressStep,
 	ScrollStep,
 	PageExtractionStep,
+	DOMContentExtractionStep,
+	ExtractionMarkedStep,
 ]
 
 AgenticWorkflowStep = AgentTaskWorkflowStep

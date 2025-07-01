@@ -22,6 +22,7 @@ from workflow_use.schema.views import (
 	AgenticWorkflowStep,
 	ClickStep,
 	DeterministicWorkflowStep,
+	DOMContentExtractionStep,
 	InputStep,
 	KeyPressStep,
 	NavigationStep,

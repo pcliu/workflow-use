@@ -8,10 +8,9 @@ from typing import Any, Dict, List, Optional, cast
 from langchain_core.exceptions import OutputParserException
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage
-from langchain_core.prompts import PromptTemplate
 from pydantic import ValidationError
 
-from workflow_use.builder.prompts import WORKFLOW_BUILDER_PROMPT_TEMPLATE
+from workflow_use.builder.prompts import DOM_EXTRACTION_REFINEMENT_TEMPLATE, WORKFLOW_BUILDER_PROMPT_TEMPLATE
 from workflow_use.controller.service import WorkflowController
 from workflow_use.schema.views import WorkflowDefinitionSchema
 
@@ -45,7 +44,7 @@ class BuilderService:
 			# Output parsing will be handled manually later
 			self.llm_structured = llm  # Store the original llm
 
-		self.prompt_template = PromptTemplate.from_template(WORKFLOW_BUILDER_PROMPT_TEMPLATE)
+		self.prompt_template = WORKFLOW_BUILDER_PROMPT_TEMPLATE
 		self.actions_markdown = self._get_available_actions_markdown()
 		logger.info('BuilderService initialized.')
 
@@ -108,6 +107,94 @@ class BuilderService:
 			),
 			None,
 		)
+
+	def _process_dom_content_marking(self, steps: List[Any]) -> List[Any]:
+		"""Process DOM content marking events and enhance them with LLM-generated selectors."""
+		processed_steps = []
+		
+		for step in steps:
+			step_dict = step.model_dump() if hasattr(step, 'model_dump') else step
+			step_type = step_dict.get('type')
+			
+			if step_type == 'extract_content_marked':
+				# Convert extract_content_marked to extract_dom_content with LLM refinement
+				extraction_rule = step_dict.get('extractionRule', '')
+				html_sample = step_dict.get('htmlSample', '')
+				multiple = step_dict.get('multiple', False)
+				container_selector = step_dict.get('cssSelector', '')
+				
+				logger.info(f"Processing extract_content_marked step: rule='{extraction_rule}', multiple={multiple}")
+				
+				# Skip LLM processing if no extraction rule
+				if not extraction_rule:
+					logger.warning("No extraction rule found, skipping LLM refinement")
+					processed_steps.append(step)
+					continue
+				
+				# Use LLM to refine extraction rules
+				refined_extraction = self._refine_extraction_with_llm(
+					extraction_rule, html_sample, multiple, container_selector
+				)
+				
+				# Create refined DOM extraction step
+				refined_step = {
+					'type': 'extract_dom_content',
+					'timestamp': step_dict.get('timestamp'),
+					'tabId': step_dict.get('tabId'),
+					'url': step_dict.get('url'),
+					'frameUrl': step_dict.get('frameUrl'),
+					'containerSelector': refined_extraction.get('containerSelector', container_selector),
+					'fields': refined_extraction.get('fields', []),
+					'multiple': multiple,
+					'excludeSelectors': refined_extraction.get('excludeSelectors', []),
+					'extractionRule': extraction_rule,  # Keep original for reference
+					'htmlSample': html_sample,  # Keep original for reference
+					'description': f'Extract content: {extraction_rule}'
+				}
+				processed_steps.append(refined_step)
+				logger.info(f"Refined extract_content_marked to extract_dom_content: {extraction_rule}")
+			else:
+				processed_steps.append(step)
+		
+		return processed_steps
+	
+	def _refine_extraction_with_llm(self, extraction_rule: str, html_sample: str, multiple: bool, container_selector: str) -> Dict[str, Any]:
+		"""Use LLM to convert natural language extraction rules into precise CSS selectors."""
+		try:
+			# Prepare the prompt
+			prompt = DOM_EXTRACTION_REFINEMENT_TEMPLATE.format(
+				extraction_rule=extraction_rule,
+				html_sample=html_sample[:2000],  # Limit HTML sample size
+				multiple=multiple,
+				container_selector=container_selector
+			)
+			
+			# Call LLM
+			message = HumanMessage(content=prompt)
+			response = self.model.invoke([message])
+			
+			# Parse JSON response
+			response_text = response.content.strip()
+			# Remove markdown code blocks if present
+			if response_text.startswith('```json'):
+				response_text = response_text[7:-3].strip()
+			elif response_text.startswith('```'):
+				response_text = response_text[3:-3].strip()
+			
+			refined_extraction = json.loads(response_text)
+			logger.info(f"LLM refined extraction: {refined_extraction}")
+			return refined_extraction
+			
+		except Exception as e:
+			logger.error(f"Failed to refine extraction with LLM: {e}")
+			logger.error(f"Raw LLM response: {response_text if 'response_text' in locals() else 'No response received'}")
+			logger.error(f"Extraction rule: {extraction_rule}")
+			# Fallback to basic structure
+			return {
+				'containerSelector': container_selector,
+				'fields': [{'name': 'content', 'selector': '', 'type': 'text'}],
+				'excludeSelectors': []
+			}
 
 	@staticmethod
 	def _filter_redundant_navigations(steps: List[Any]) -> List[Any]:
@@ -216,6 +303,10 @@ class BuilderService:
 		# Pre-filter redundant navigation events to reduce noise for LLM
 		filtered_steps = self._filter_redundant_navigations(input_workflow.steps)
 		input_workflow.steps = filtered_steps
+		
+		# Process DOM content marking events
+		processed_steps = self._process_dom_content_marking(input_workflow.steps)
+		input_workflow.steps = processed_steps
 
 		# Handle user goal
 		goal = user_goal

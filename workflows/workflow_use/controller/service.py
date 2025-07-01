@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from typing import List, Optional
 
 from browser_use import Browser
 from browser_use.agent.views import ActionResult
@@ -10,11 +11,12 @@ from langchain_core.prompts import PromptTemplate
 from workflow_use.controller.utils import get_best_element_handle, truncate_selector
 from workflow_use.controller.views import (
 	ClickElementDeterministicAction,
+	DOMExtractionAction,
+	DOMExtractionField,
 	InputTextDeterministicAction,
 	KeyPressDeterministicAction,
 	NavigationAction,
 	PageExtractionAction,
-	DOMExtractionAction,
 	ScrollDeterministicAction,
 	SelectDropdownOptionDeterministicAction,
 )
@@ -267,49 +269,69 @@ class WorkflowController(Controller):
 				raise Exception(error_msg)
 
 		async def _extract_dom_elements(self, page, params: DOMExtractionAction, llm: BaseChatModel):
-			"""Core DOM extraction logic with selector fallback and intelligent parsing."""
+			"""Core DOM extraction logic with structured field extraction."""
 			results = []
 			
-			# Try selectors in priority order
-			element_found = False
-			for selector_config in params.selectors:
-				try:
-					selector_type = selector_config.get('type')
-					selector_value = selector_config.get('value')
+			# Find container elements
+			try:
+				containers = await page.query_selector_all(params.containerSelector)
+				if not containers:
+					raise Exception(f"No container elements found with selector: {params.containerSelector}")
+				
+				logger.info(f'Found {len(containers)} container elements')
+				
+				# If not multiple mode, take only first container
+				if not params.multiple:
+					containers = containers[:1]
+				
+				# Extract data from each container
+				for container in containers:
+					container_data = {}
 					
-					if selector_type == 'css':
-						elements = await page.query_selector_all(selector_value)
-					elif selector_type == 'xpath':
-						elements = await page.query_selector_all(f'xpath={selector_value}')
-					else:
-						continue
+					# Extract each field
+					for field in params.fields:
+						field_value = await self._extract_field_value(container, field, params.excludeSelectors)
+						container_data[field.name] = field_value
 					
-					if elements:
-						element_found = True
-						logger.info(f'Found {len(elements)} elements with {selector_type}: {selector_value}')
-						
-						# Extract content based on configuration
-						for element in elements:
-							content = await self._extract_element_content(element)
-							results.append(content)
-						
-						# If not multiple mode, take first result
-						if not params.multiple:
-							results = results[:1]
-						break
-						
-				except Exception as e:
-					logger.warning(f'Selector {selector_type}:{selector_value} failed: {e}')
-					continue
-			
-			if not element_found:
-				raise Exception("No elements found with any of the provided selectors")
-			
-			# Use LLM to parse content according to natural language rule
-			if params.extractionRule and any(len(str(result)) > 50 for result in results):
-				return await self._parse_complex_content(results, params.extractionRule, llm)
-			
-			return results[0] if len(results) == 1 else results
+					results.append(container_data)
+				
+				return results[0] if len(results) == 1 else results
+				
+			except Exception as e:
+				logger.error(f'DOM extraction failed: {e}')
+				raise Exception(f"DOM extraction failed: {str(e)}")
+		
+		async def _extract_field_value(self, container, field: DOMExtractionField, exclude_selectors: Optional[List[str]] = None):
+			"""Extract value for a specific field from a container element."""
+			try:
+				# Find the field element within the container
+				field_element = await container.query_selector(field.selector)
+				if not field_element:
+					logger.warning(f'Field element not found with selector: {field.selector}')
+					return None
+				
+				# Check if element should be excluded
+				if exclude_selectors:
+					for exclude_selector in exclude_selectors:
+						if await field_element.query_selector(exclude_selector):
+							logger.info(f'Field element excluded by selector: {exclude_selector}')
+							return None
+				
+				# Extract value based on field type
+				if field.type == 'text':
+					return await field_element.inner_text()
+				elif field.type == 'href':
+					return await field_element.get_attribute('href')
+				elif field.type == 'src':
+					return await field_element.get_attribute('src')
+				elif field.type == 'attribute' and field.attribute:
+					return await field_element.get_attribute(field.attribute)
+				else:
+					return await field_element.inner_text()  # Default to text
+					
+			except Exception as e:
+				logger.warning(f'Failed to extract field {field.name}: {e}')
+				return None
 
 		async def _extract_element_content(self, element):
 			"""Extract content from a single element - returns both text and HTML for LLM processing."""
@@ -346,7 +368,7 @@ Return only the JSON data, no explanation.
 				import json
 				try:
 					return json.loads(response.content)
-				except:
+				except json.JSONDecodeError:
 					return response.content
 			except Exception as e:
 				logger.warning(f'LLM parsing failed: {e}')

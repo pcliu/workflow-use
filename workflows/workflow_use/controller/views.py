@@ -1,4 +1,4 @@
-from typing import Literal, Optional, List, Dict, Any
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel
 
@@ -81,11 +81,21 @@ class PageExtractionAction(_BaseExtra):
 	goal: str
 
 
+class DOMExtractionField(BaseModel):
+	"""Schema for individual fields to extract from DOM elements."""
+	name: str
+	selector: str
+	type: Literal['text', 'href', 'src', 'attribute'] = 'text'
+	attribute: Optional[str] = None
+
+
 class DOMExtractionAction(RecorderBase):
-	"""Parameters for extracting DOM content using natural language rules."""
+	"""Parameters for extracting DOM content using structured field definitions."""
 
 	type: Literal['extract_dom_content']
-	selectors: List[Dict[str, Any]]  # Array of selector configs with priorities
-	extractionRule: str              # Natural language extraction rule
-	multiple: bool = False           # Whether to extract multiple items
-	htmlSample: str                  # HTML sample for context
+	containerSelector: str                        # CSS selector for container element
+	fields: List[DOMExtractionField]             # Structured field definitions
+	multiple: bool = False                       # Whether to extract multiple containers
+	excludeSelectors: Optional[List[str]] = None # CSS selectors to exclude
+	extractionRule: Optional[str] = None         # Original natural language rule (informational)
+	htmlSample: Optional[str] = None             # HTML sample for reference (informational)
