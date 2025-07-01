@@ -12,7 +12,7 @@ from pydantic import ValidationError
 
 from workflow_use.builder.prompts import DOM_EXTRACTION_REFINEMENT_TEMPLATE, WORKFLOW_BUILDER_PROMPT_TEMPLATE
 from workflow_use.controller.service import WorkflowController
-from workflow_use.schema.views import WorkflowDefinitionSchema
+from workflow_use.schema.views import WorkflowDefinitionSchema, DOMContentExtractionStep
 
 logger = logging.getLogger(__name__)
 
@@ -137,20 +137,20 @@ class BuilderService:
 				)
 				
 				# Create refined DOM extraction step
-				refined_step = {
-					'type': 'extract_dom_content',
-					'timestamp': step_dict.get('timestamp'),
-					'tabId': step_dict.get('tabId'),
-					'url': step_dict.get('url'),
-					'frameUrl': step_dict.get('frameUrl'),
-					'containerSelector': refined_extraction.get('containerSelector', container_selector),
-					'fields': refined_extraction.get('fields', []),
-					'multiple': multiple,
-					'excludeSelectors': refined_extraction.get('excludeSelectors', []),
-					'extractionRule': extraction_rule,  # Keep original for reference
-					'htmlSample': html_sample,  # Keep original for reference
-					'description': f'Extract content: {extraction_rule}'
-				}
+				refined_step = DOMContentExtractionStep(
+					type='extract_dom_content',
+					timestamp=step_dict.get('timestamp'),
+					tabId=step_dict.get('tabId'),
+					url=step_dict.get('url'),
+					frameUrl=step_dict.get('frameUrl'),
+					containerSelector=refined_extraction.get('containerSelector', container_selector),
+					fields=refined_extraction.get('fields', []),
+					multiple=multiple,
+					excludeSelectors=refined_extraction.get('excludeSelectors', []),
+					extractionRule=extraction_rule,
+					htmlSample=html_sample,
+					description=f'Extract content: {extraction_rule}'
+				)
 				processed_steps.append(refined_step)
 				logger.info(f"Refined extract_content_marked to extract_dom_content: {extraction_rule}")
 			else:
