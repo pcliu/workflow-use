@@ -418,6 +418,14 @@ const CAPTURED_KEYS = new Set([
 function handleKeydown(event: KeyboardEvent) {
   if (!isRecordingActive) return;
 
+  const targetElement = event.target as HTMLElement;
+  
+  // Filter out UI element keyboard events
+  if (targetElement && shouldIgnoreUIElement(targetElement)) {
+    console.log("Ignoring UI element keydown:", targetElement.tagName, targetElement.id || targetElement.className);
+    return;
+  }
+
   const key = event.key;
   let keyToLog = "";
 
