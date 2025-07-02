@@ -124,7 +124,7 @@ class BuilderService:
 				extraction_rule = step_dict.get('extractionRule', '')
 				html_sample = step_dict.get('htmlSample', '')
 				multiple = step_dict.get('multiple', False)
-				container_selector = step_dict.get('cssSelector', '')
+				container_xpath = step_dict.get('xpath', '')
 				
 				logger.info(f"Processing extract_content_marked step: rule='{extraction_rule}', multiple={multiple}")
 				
@@ -136,7 +136,7 @@ class BuilderService:
 				
 				# Use LLM to refine extraction rules
 				refined_extraction = self._refine_extraction_with_llm(
-					extraction_rule, html_sample, multiple, container_selector
+					extraction_rule, html_sample, multiple, container_xpath
 				)
 				
 				# Create refined DOM extraction step
@@ -146,10 +146,10 @@ class BuilderService:
 					tabId=step_dict.get('tabId'),
 					url=step_dict.get('url'),
 					frameUrl=step_dict.get('frameUrl'),
-					containerSelector=refined_extraction.get('containerSelector', container_selector),
+					containerXpath=refined_extraction.get('containerXpath', container_xpath),
 					fields=refined_extraction.get('fields', []),
 					multiple=multiple,
-					excludeSelectors=refined_extraction.get('excludeSelectors', []),
+					excludeXpaths=refined_extraction.get('excludeXpaths', []),
 					extractionRule=extraction_rule,
 					htmlSample=html_sample,
 					description=f'Extract content: {extraction_rule}'
@@ -161,15 +161,15 @@ class BuilderService:
 		
 		return processed_steps
 	
-	def _refine_extraction_with_llm(self, extraction_rule: str, html_sample: str, multiple: bool, container_selector: str) -> Dict[str, Any]:
-		"""Use LLM to convert natural language extraction rules into precise CSS selectors."""
+	def _refine_extraction_with_llm(self, extraction_rule: str, html_sample: str, multiple: bool, container_xpath: str) -> Dict[str, Any]:
+		"""Use LLM to convert natural language extraction rules into precise xpath selectors."""
 		try:
 			# Prepare the prompt using LangChain PromptTemplate
 			prompt_inputs = {
 				'extraction_rule': extraction_rule,
 				'html_sample': html_sample[:2000],  # Limit HTML sample size
 				'multiple': multiple,
-				'container_selector': container_selector
+				'container_xpath': container_xpath
 			}
 			# Prepare the prompt using LangChain PromptTemplate
 			prompt = DOM_EXTRACTION_REFINEMENT_TEMPLATE.format(**prompt_inputs)
@@ -193,8 +193,8 @@ class BuilderService:
 			refined_extraction = json.loads(response_text)
 			logger.info(f"LLM refined extraction: {refined_extraction}")
 			
-			# Validate and fix CSS selectors
-			refined_extraction = self._validate_and_fix_selectors(refined_extraction)
+			# Validate and fix xpath selectors
+			refined_extraction = self._validate_and_fix_xpaths(refined_extraction)
 			
 			return refined_extraction
 			
@@ -203,59 +203,48 @@ class BuilderService:
 			logger.error(f"Extraction rule: {extraction_rule}")
 			# Fallback to basic structure
 			return {
-				'containerSelector': container_selector,
-				'fields': [{'name': 'content', 'selector': '', 'type': 'text'}],
-				'excludeSelectors': []
+				'containerXpath': container_xpath,
+				'fields': [{'name': 'content', 'xpath': '.', 'type': 'text'}],
+				'excludeXpaths': []
 			}
 
-	def _validate_and_fix_selectors(self, extraction_config: Dict[str, Any]) -> Dict[str, Any]:
-		"""Validate CSS selectors and fix common issues."""
-		# Fix container selector
-		container_selector = extraction_config.get('containerSelector', '')
-		extraction_config['containerSelector'] = self._fix_css_selector(container_selector)
+	def _validate_and_fix_xpaths(self, extraction_config: Dict[str, Any]) -> Dict[str, Any]:
+		"""Validate xpath selectors and fix common issues."""
+		# Fix container xpath
+		container_xpath = extraction_config.get('containerXpath', '')
+		extraction_config['containerXpath'] = self._fix_xpath(container_xpath)
 		
-		# Fix field selectors
+		# Fix field xpaths
 		fields = extraction_config.get('fields', [])
 		for field in fields:
-			if 'selector' in field:
-				field['selector'] = self._fix_css_selector(field['selector'])
+			if 'xpath' in field:
+				field['xpath'] = self._fix_xpath(field['xpath'])
 		
-		# Fix exclude selectors
-		exclude_selectors = extraction_config.get('excludeSelectors', [])
-		extraction_config['excludeSelectors'] = [
-			self._fix_css_selector(selector) for selector in exclude_selectors
+		# Fix exclude xpaths
+		exclude_xpaths = extraction_config.get('excludeXpaths', [])
+		extraction_config['excludeXpaths'] = [
+			self._fix_xpath(xpath) for xpath in exclude_xpaths
 		]
 		
-		logger.info(f"Validated selectors: {extraction_config}")
+		logger.info(f"Validated xpaths: {extraction_config}")
 		return extraction_config
 	
-	def _fix_css_selector(self, selector: str) -> str:
-		"""Fix common CSS selector issues."""
-		if not selector:
-			return selector
+	def _fix_xpath(self, xpath: str) -> str:
+		"""Fix common xpath issues."""
+		if not xpath:
+			return xpath
 			
-		# Remove unsupported pseudo-selectors
-		forbidden_patterns = [
-			r':contains\([^)]+\)',  # :contains("text")
-			r':has-text\([^)]+\)',  # :has-text("text")
-			r':text\([^)]+\)',      # :text("text")
-			r':has\([^)]+\)',       # :has(selector)
-		]
+		# Clean up extra spaces
+		fixed_xpath = re.sub(r'\s+', ' ', xpath).strip()
 		
-		fixed_selector = selector
-		for pattern in forbidden_patterns:
-			import re
-			fixed_selector = re.sub(pattern, '', fixed_selector)
+		# Ensure xpath starts with proper path syntax
+		if fixed_xpath and not fixed_xpath.startswith(('.', '/', '(')):
+			fixed_xpath = '.' + fixed_xpath
 		
-		# Clean up extra spaces and colons
-		fixed_selector = re.sub(r'\s+', ' ', fixed_selector).strip()
-		fixed_selector = re.sub(r':\s*:', ':', fixed_selector)
-		fixed_selector = re.sub(r':\s*$', '', fixed_selector)
-		
-		if fixed_selector != selector:
-			logger.warning(f"Fixed CSS selector: '{selector}' -> '{fixed_selector}'")
+		if fixed_xpath != xpath:
+			logger.warning(f"Fixed xpath: '{xpath}' -> '{fixed_xpath}'")
 			
-		return fixed_selector
+		return fixed_xpath
 
 	@staticmethod
 	def _filter_redundant_navigations(steps: List[Any]) -> List[Any]:

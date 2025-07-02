@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import re
 from typing import List, Optional
 
 from browser_use import Browser
@@ -270,16 +271,34 @@ class WorkflowController(Controller):
 				raise Exception(error_msg)
 
 	async def _extract_dom_elements(self, page, params: DOMExtractionAction, llm: BaseChatModel):
-		"""Core DOM extraction logic with structured field extraction."""
+		"""Core DOM extraction logic with structured field extraction supporting both XPath and CSS."""
 		results = []
 		
-		# Find container elements
+		# Find container elements - support both XPath and CSS selectors
 		try:
-			containers = await page.query_selector_all(params.containerSelector)
-			if not containers:
-				raise Exception(f"No container elements found with selector: {params.containerSelector}")
+			containers = []
 			
-			logger.info(f'Found {len(containers)} container elements')
+			# Priority 1: Try containerXpath if available
+			if hasattr(params, 'containerXpath') and params.containerXpath:
+				try:
+					# Convert XPath format like .id('info') to standard XPath
+					xpath = self._normalize_xpath(params.containerXpath)
+					containers = await self._query_elements_by_xpath(page, xpath)
+					logger.info(f'Found {len(containers)} containers using XPath: {xpath}')
+				except Exception as e:
+					logger.warning(f'XPath container selection failed: {e}')
+			
+			# Fallback: Try CSS selector
+			if not containers and hasattr(params, 'containerSelector') and params.containerSelector:
+				try:
+					containers = await page.query_selector_all(params.containerSelector)
+					logger.info(f'Found {len(containers)} containers using CSS: {params.containerSelector}')
+				except Exception as e:
+					logger.warning(f'CSS container selection failed: {e}')
+			
+			if not containers:
+				container_info = getattr(params, 'containerXpath', None) or getattr(params, 'containerSelector', 'unknown')
+				raise Exception(f"No container elements found with selector: {container_info}")
 			
 			# If not multiple mode, take only first container
 			if not params.multiple:
@@ -291,7 +310,7 @@ class WorkflowController(Controller):
 				
 				# Extract each field
 				for field in params.fields:
-					field_value = await self._extract_field_value(container, field, params.excludeSelectors)
+					field_value = await self._extract_field_value(container, field, getattr(params, 'excludeSelectors', None) or getattr(params, 'excludeXpaths', None))
 					container_data[field.name] = field_value
 			
 				results.append(container_data)
@@ -302,29 +321,59 @@ class WorkflowController(Controller):
 			logger.error(f'DOM extraction failed: {e}')
 			raise Exception(f"DOM extraction failed: {str(e)}")
 	
-	async def _extract_field_value(self, container, field: DOMExtractionField, exclude_selectors: Optional[List[str]] = None):
-		"""Extract value for a specific field from a container element with fallback strategies."""
+	def _normalize_xpath(self, xpath: str) -> str:
+		"""Normalize XPath expressions to standard format."""
+		if xpath.startswith('id(') or xpath.startswith('.id('):
+			# Convert id('info') or .id('info') to //*[@id='info']
+			id_match = re.search(r"\.?id\(['\"]([^'\"]+)['\"]\)", xpath)
+			if id_match:
+				return f"//*[@id='{id_match.group(1)}']"
+		return xpath
+	
+	async def _query_elements_by_xpath(self, page, xpath: str):
+		"""Query elements using XPath with Playwright."""
 		try:
-			# Primary selector attempt
+			# Use Playwright's locator with XPath
+			locator = page.locator(f"xpath={xpath}")
+			elements = await locator.all()
+			return elements
+		except Exception as e:
+			logger.error(f'XPath query failed: {e}')
+			return []
+	
+	async def _extract_field_value(self, container, field: DOMExtractionField, exclude_selectors: Optional[List[str]] = None):
+		"""Extract value for a specific field from a container element with XPath and CSS support."""
+		try:
+			# Primary selector attempt - support both XPath and CSS
 			field_element = await self._find_field_element_with_fallback(container, field)
 			if not field_element:
-				logger.warning(f'Field element not found with selector: {field.selector}')
+				field_selector = getattr(field, 'xpath', None) or getattr(field, 'selector', 'unknown')
+				logger.warning(f'Field element not found with selector: {field_selector}')
 				return None
 			
 			# Check if element should be excluded
 			if exclude_selectors:
 				for exclude_selector in exclude_selectors:
 					try:
-						if await field_element.query_selector(exclude_selector):
-							logger.info(f'Field element excluded by selector: {exclude_selector}')
-							return None
+						# Support both XPath and CSS exclude selectors
+						if exclude_selector.startswith('.//') or exclude_selector.startswith('//'):
+							# XPath exclude selector - use relative XPath from field element
+							excluded_elements = await self._query_elements_by_xpath_relative(field_element, exclude_selector)
+							if excluded_elements:
+								logger.info(f'Field element excluded by XPath: {exclude_selector}')
+								return None
+						else:
+							# CSS exclude selector
+							if await field_element.query_selector(exclude_selector):
+								logger.info(f'Field element excluded by CSS: {exclude_selector}')
+								return None
 					except Exception:
 						# Ignore invalid exclude selectors
 						continue
 			
 			# Extract value based on field type
 			if field.type == 'text':
-				return await field_element.inner_text()
+				return (await field_element.inner_text()).strip()
 			elif field.type == 'href':
 				return await field_element.get_attribute('href')
 			elif field.type == 'src':
@@ -332,23 +381,54 @@ class WorkflowController(Controller):
 			elif field.type == 'attribute' and field.attribute:
 				return await field_element.get_attribute(field.attribute)
 			else:
-				return await field_element.inner_text()  # Default to text
+				return (await field_element.inner_text()).strip()  # Default to text
 				
 		except Exception as e:
 			logger.warning(f'Failed to extract field {field.name}: {e}')
 			return None
 	
-	async def _find_field_element_with_fallback(self, container, field: DOMExtractionField):
-		"""Find field element with multiple fallback strategies."""
-		# Strategy 1: Try original selector
+	async def _query_elements_by_xpath_relative(self, element, xpath: str):
+		"""Query elements using relative XPath from a given element."""
 		try:
-			element = await container.query_selector(field.selector)
-			if element:
-				return element
+			# For relative XPath queries, we need to use the element's locator
+			locator = element.locator(f"xpath={xpath}")
+			elements = await locator.all()
+			return elements
 		except Exception as e:
-			logger.warning(f'Primary selector failed for {field.name}: {e}')
+			logger.error(f'Relative XPath query failed: {e}')
+			return []
+	
+	async def _find_field_element_with_fallback(self, container, field: DOMExtractionField):
+		"""Find field element with multiple fallback strategies supporting both XPath and CSS."""
+		# Strategy 1: Try XPath if available
+		if hasattr(field, 'xpath') and field.xpath:
+			try:
+				# Handle XPath that extracts text directly (ends with /text())
+				xpath = field.xpath
+				if xpath.endswith('/text()'):
+					# For text() XPath, we need to evaluate and return the text content
+					xpath_element = xpath[:-7]  # Remove /text() suffix
+					elements = await self._query_elements_by_xpath_relative(container, xpath_element)
+					if elements:
+						return elements[0]  # Return first matching element
+				else:
+					# Regular XPath for elements
+					elements = await self._query_elements_by_xpath_relative(container, xpath)
+					if elements:
+						return elements[0]
+			except Exception as e:
+				logger.warning(f'XPath selector failed for {field.name}: {e}')
 		
-		# Strategy 2: Try fallback selectors based on field name
+		# Strategy 2: Try CSS selector if available
+		if hasattr(field, 'selector') and field.selector:
+			try:
+				element = await container.query_selector(field.selector)
+				if element:
+					return element
+			except Exception as e:
+				logger.warning(f'CSS selector failed for {field.name}: {e}')
+		
+		# Strategy 3: Try fallback selectors based on field name
 		fallback_selectors = self._generate_fallback_selectors(field.name)
 		for fallback_selector in fallback_selectors:
 			try:

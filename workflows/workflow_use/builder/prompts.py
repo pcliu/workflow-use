@@ -55,23 +55,23 @@ Follow these rules when generating the output JSON:
 7. **DOM Content Extraction Rules** - When you encounter "extract_dom_content" steps:
    - Analyze the "htmlSample" to understand the structure of the target content
    - Parse the "extractionRule" (natural language) to identify what specific data to extract
-   - Generate precise "fields" array with field names, CSS selectors, and data types
-   - Use "containerSelector" to identify the repeating element container (for multiple items)
+   - Generate precise "fields" array with field names, XPath expressions, and data types
+   - Use "containerXpath" to identify the repeating element container (for multiple items)
    - Example transformation:
      ```
      Input: {{"extractionRule": "Extract rating, title and review content from each comment, ignore ads", "multiple": true}}
      Output: {{
        "type": "extract_dom_content",
-       "containerSelector": ".review-item",
+       "containerXpath": "//div[contains(@class, 'review-item')]",
        "fields": [
-         {{"name": "rating", "selector": ".star-rating", "type": "text"}},
-         {{"name": "title", "selector": "h3.review-title", "type": "text"}}, 
-         {{"name": "content", "selector": ".review-text", "type": "text"}}
+         {{"name": "rating", "xpath": ".//span[contains(@class, 'star-rating')]/text()", "type": "text"}},
+         {{"name": "title", "xpath": ".//h3[contains(@class, 'review-title')]/text()", "type": "text"}}, 
+         {{"name": "content", "xpath": ".//div[contains(@class, 'review-text')]//text()", "type": "text"}}
        ],
-       "excludeSelectors": [".advertisement", ".sponsored"]
+       "excludeXpaths": [".//div[contains(@class, 'advertisement')]", ".//div[contains(@class, 'sponsored')]"]
      }}
      ```
-   - Always include robust fallback selectors and exclude irrelevant content (ads, navigation, etc.)
+   - Always include robust fallback XPath expressions and exclude irrelevant content (ads, navigation, etc.)
 
 
 High-level task description provided by the user (may be empty):
@@ -84,9 +84,9 @@ Input session events will follow one-by-one in subsequent messages.
 """
 
 # DOM Extraction Refinement Prompt
-DOM_EXTRACTION_REFINEMENT_PROMPT = """You are an expert at analyzing HTML structure and generating precise CSS selectors for data extraction.
+DOM_EXTRACTION_REFINEMENT_PROMPT = """You are an expert at analyzing HTML structure and generating precise XPath selectors for data extraction.
 
-Given a natural language extraction rule and an HTML sample, generate precise field mappings with CSS selectors.
+Given a natural language extraction rule and an HTML sample, generate precise field mappings with XPath selectors.
 
 **Task**: Convert the natural language rule into structured field definitions.
 
@@ -94,37 +94,38 @@ Given a natural language extraction rule and an HTML sample, generate precise fi
 - Extraction Rule: {extraction_rule}
 - HTML Sample: {html_sample}
 - Multiple Items: {multiple}
-- Container Selector: {container_selector}
+- Container XPath: {container_xpath}
 
-**CRITICAL CSS SELECTOR RULES**:
-- ONLY use standard CSS selectors supported by querySelector()
-- DO NOT use pseudo-selectors like :contains(), :has-text(), etc.
-- Use element tags, classes (.class), IDs (#id), attributes ([attr="value"]), and combinators (>, +, ~, space)
-- For text matching, analyze the HTML structure and use class names, IDs, or element positions
-- When targeting Chinese text content, look for surrounding structural elements instead of text matching
+**CRITICAL XPATH RULES**:
+- ONLY use standard XPath expressions supported by browser XPath engines
+- Use element tags, class attributes, IDs, and text content for precise targeting
+- For class matching, use contains(@class, 'classname') or exact @class='classname'
+- For text matching, use text()='exact text' or contains(text(), 'partial text')
+- Use relative paths starting with .// for fields relative to container
+- Leverage position-based selection with [position()] when needed
 
 **Instructions**:
 1. Analyze the HTML structure to identify repeating patterns and data elements
 2. Generate field names based on the extraction rule (use snake_case)
-3. Create STANDARD CSS selectors for each field relative to the container
-4. Focus on structural elements (classes, IDs, tag hierarchy) rather than text content
-5. Use nth-child(), nth-of-type() for positional selection when needed
+3. Create STANDARD XPath expressions for each field relative to the container
+4. Use structural elements (classes, IDs, tag hierarchy) and text content for precise targeting
+5. Use position-based selection [1], [2], etc. or [position()=N] when needed
 6. Identify elements to exclude (ads, navigation, timestamps if mentioned)
-7. For multiple items, ensure selectors work within each container instance
+7. For multiple items, ensure XPath expressions work within each container instance
 
 **Output Format**: Return ONLY a JSON object with this structure:
 ```json
 {{
-  "containerSelector": "precise CSS selector for the container",
+  "containerXpath": "precise XPath expression for the container",
   "fields": [
     {{
       "name": "field_name", 
-      "selector": "CSS selector relative to container",
+      "xpath": "XPath expression relative to container",
       "type": "text|href|src|attribute",
       "attribute": "attribute_name (if type is attribute)"
     }}
   ],
-  "excludeSelectors": ["selector1", "selector2"]
+  "excludeXpaths": ["xpath1", "xpath2"]
 }}
 ```
 
@@ -133,13 +134,13 @@ Input: "Extract rating, title and review content from each comment, ignore ads"
 Output:
 ```json
 {{
-  "containerSelector": ".review-item",
+  "containerXpath": "//div[contains(@class, 'review-item')]",
   "fields": [
-    {{"name": "rating", "selector": ".star-rating", "type": "text"}},
-    {{"name": "title", "selector": "h3.review-title", "type": "text"}},
-    {{"name": "content", "selector": ".review-text", "type": "text"}}
+    {{"name": "rating", "xpath": ".//span[contains(@class, 'star-rating')]/text()", "type": "text"}},
+    {{"name": "title", "xpath": ".//h3[contains(@class, 'review-title')]/text()", "type": "text"}},
+    {{"name": "content", "xpath": ".//div[contains(@class, 'review-text')]//text()", "type": "text"}}
   ],
-  "excludeSelectors": [".advertisement", ".sponsored-content"]
+  "excludeXpaths": [".//div[contains(@class, 'advertisement')]", ".//div[contains(@class, 'sponsored-content')]"]
 }}
 ```
 

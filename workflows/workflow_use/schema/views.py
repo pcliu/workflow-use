@@ -98,19 +98,19 @@ class PageExtractionStep(TimestampedWorkflowStep):
 class DOMExtractionField(BaseModel):
 	"""Schema for individual fields to extract from DOM elements."""
 	name: str = Field(..., description='Field name for the extracted data.')
-	selector: str = Field(..., description='CSS selector for the specific field.')
+	xpath: str = Field(..., description='XPath selector for the specific field, relative to container.')
 	type: Literal['text', 'href', 'src', 'attribute'] = Field('text', description='Type of data to extract.')
 	attribute: Optional[str] = Field(None, description='Attribute name if type is "attribute".')
 
 
 class DOMContentExtractionStep(TimestampedWorkflowStep):
-	"""Extracts structured content from DOM elements using refined selectors."""
+	"""Extracts structured content from DOM elements using refined xpath selectors."""
 
 	type: Literal['extract_dom_content']
-	containerSelector: str = Field(..., description='CSS selector for the container element (or single element if not multiple).')
+	containerXpath: str = Field(..., description='XPath selector for the container element (or single element if not multiple).')
 	fields: List[DOMExtractionField] = Field(..., description='Array of fields to extract from each container.')
 	multiple: bool = Field(False, description='Whether to extract from multiple container elements.')
-	excludeSelectors: Optional[List[str]] = Field(None, description='CSS selectors for elements to exclude from extraction.')
+	excludeXpaths: Optional[List[str]] = Field(None, description='XPath selectors for elements to exclude from extraction.')
 	extractionRule: Optional[str] = Field(None, description='Original natural language extraction rule (informational).')
 	htmlSample: Optional[str] = Field(None, description='Sample HTML for reference (informational).')
 
