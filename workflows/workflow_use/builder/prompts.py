@@ -96,42 +96,51 @@ Given a natural language extraction rule and an HTML sample, generate precise fi
 - Multiple Items: {multiple}
 - Container Selector: {container_selector}
 
+**CRITICAL CSS SELECTOR RULES**:
+- ONLY use standard CSS selectors supported by querySelector()
+- DO NOT use pseudo-selectors like :contains(), :has-text(), etc.
+- Use element tags, classes (.class), IDs (#id), attributes ([attr="value"]), and combinators (>, +, ~, space)
+- For text matching, analyze the HTML structure and use class names, IDs, or element positions
+- When targeting Chinese text content, look for surrounding structural elements instead of text matching
+
 **Instructions**:
 1. Analyze the HTML structure to identify repeating patterns and data elements
 2. Generate field names based on the extraction rule (use snake_case)
-3. Create precise CSS selectors for each field relative to the container
-4. Identify elements to exclude (ads, navigation, timestamps if mentioned)
-5. For multiple items, ensure selectors work within each container instance
+3. Create STANDARD CSS selectors for each field relative to the container
+4. Focus on structural elements (classes, IDs, tag hierarchy) rather than text content
+5. Use nth-child(), nth-of-type() for positional selection when needed
+6. Identify elements to exclude (ads, navigation, timestamps if mentioned)
+7. For multiple items, ensure selectors work within each container instance
 
 **Output Format**: Return ONLY a JSON object with this structure:
 ```json
-{
+{{
   "containerSelector": "precise CSS selector for the container",
   "fields": [
-    {
+    {{
       "name": "field_name", 
       "selector": "CSS selector relative to container",
       "type": "text|href|src|attribute",
       "attribute": "attribute_name (if type is attribute)"
-    }
+    }}
   ],
   "excludeSelectors": ["selector1", "selector2"]
-}
+}}
 ```
 
 **Example**:
 Input: "Extract rating, title and review content from each comment, ignore ads"
 Output:
 ```json
-{
+{{
   "containerSelector": ".review-item",
   "fields": [
-    {"name": "rating", "selector": ".star-rating", "type": "text"},
-    {"name": "title", "selector": "h3.review-title", "type": "text"},
-    {"name": "content", "selector": ".review-text", "type": "text"}
+    {{"name": "rating", "selector": ".star-rating", "type": "text"}},
+    {{"name": "title", "selector": "h3.review-title", "type": "text"}},
+    {{"name": "content", "selector": ".review-text", "type": "text"}}
   ],
   "excludeSelectors": [".advertisement", ".sponsored-content"]
-}
+}}
 ```
 
 Generate the JSON response now:"""

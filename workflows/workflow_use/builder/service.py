@@ -34,6 +34,9 @@ class BuilderService:
 		if llm is None:
 			raise ValueError('A BaseChatModel instance must be provided.')
 
+		# Store the original LLM for general use
+		self.model = llm
+		
 		# Configure the LLM to return structured output based on the Pydantic model
 		try:
 			# Specify method="function_calling" for better compatibility
@@ -161,20 +164,26 @@ class BuilderService:
 	def _refine_extraction_with_llm(self, extraction_rule: str, html_sample: str, multiple: bool, container_selector: str) -> Dict[str, Any]:
 		"""Use LLM to convert natural language extraction rules into precise CSS selectors."""
 		try:
-			# Prepare the prompt
-			prompt = DOM_EXTRACTION_REFINEMENT_TEMPLATE.format(
-				extraction_rule=extraction_rule,
-				html_sample=html_sample[:2000],  # Limit HTML sample size
-				multiple=multiple,
-				container_selector=container_selector
-			)
+			# Prepare the prompt using LangChain PromptTemplate
+			prompt_inputs = {
+				'extraction_rule': extraction_rule,
+				'html_sample': html_sample[:2000],  # Limit HTML sample size
+				'multiple': multiple,
+				'container_selector': container_selector
+			}
+			# Prepare the prompt using LangChain PromptTemplate
+			prompt = DOM_EXTRACTION_REFINEMENT_TEMPLATE.format(**prompt_inputs)
 			
-			# Call LLM
+			# Call LLM synchronously 
 			message = HumanMessage(content=prompt)
 			response = self.model.invoke([message])
 			
 			# Parse JSON response
-			response_text = response.content.strip()
+			response_text = response.content.strip() if hasattr(response, 'content') and response.content else ""
+			
+			if not response_text:
+				raise ValueError("LLM returned empty response")
+			
 			# Remove markdown code blocks if present
 			if response_text.startswith('```json'):
 				response_text = response_text[7:-3].strip()
@@ -183,11 +192,14 @@ class BuilderService:
 			
 			refined_extraction = json.loads(response_text)
 			logger.info(f"LLM refined extraction: {refined_extraction}")
+			
+			# Validate and fix CSS selectors
+			refined_extraction = self._validate_and_fix_selectors(refined_extraction)
+			
 			return refined_extraction
 			
 		except Exception as e:
 			logger.error(f"Failed to refine extraction with LLM: {e}")
-			logger.error(f"Raw LLM response: {response_text if 'response_text' in locals() else 'No response received'}")
 			logger.error(f"Extraction rule: {extraction_rule}")
 			# Fallback to basic structure
 			return {
@@ -195,6 +207,55 @@ class BuilderService:
 				'fields': [{'name': 'content', 'selector': '', 'type': 'text'}],
 				'excludeSelectors': []
 			}
+
+	def _validate_and_fix_selectors(self, extraction_config: Dict[str, Any]) -> Dict[str, Any]:
+		"""Validate CSS selectors and fix common issues."""
+		# Fix container selector
+		container_selector = extraction_config.get('containerSelector', '')
+		extraction_config['containerSelector'] = self._fix_css_selector(container_selector)
+		
+		# Fix field selectors
+		fields = extraction_config.get('fields', [])
+		for field in fields:
+			if 'selector' in field:
+				field['selector'] = self._fix_css_selector(field['selector'])
+		
+		# Fix exclude selectors
+		exclude_selectors = extraction_config.get('excludeSelectors', [])
+		extraction_config['excludeSelectors'] = [
+			self._fix_css_selector(selector) for selector in exclude_selectors
+		]
+		
+		logger.info(f"Validated selectors: {extraction_config}")
+		return extraction_config
+	
+	def _fix_css_selector(self, selector: str) -> str:
+		"""Fix common CSS selector issues."""
+		if not selector:
+			return selector
+			
+		# Remove unsupported pseudo-selectors
+		forbidden_patterns = [
+			r':contains\([^)]+\)',  # :contains("text")
+			r':has-text\([^)]+\)',  # :has-text("text")
+			r':text\([^)]+\)',      # :text("text")
+			r':has\([^)]+\)',       # :has(selector)
+		]
+		
+		fixed_selector = selector
+		for pattern in forbidden_patterns:
+			import re
+			fixed_selector = re.sub(pattern, '', fixed_selector)
+		
+		# Clean up extra spaces and colons
+		fixed_selector = re.sub(r'\s+', ' ', fixed_selector).strip()
+		fixed_selector = re.sub(r':\s*:', ':', fixed_selector)
+		fixed_selector = re.sub(r':\s*$', '', fixed_selector)
+		
+		if fixed_selector != selector:
+			logger.warning(f"Fixed CSS selector: '{selector}' -> '{fixed_selector}'")
+			
+		return fixed_selector
 
 	@staticmethod
 	def _filter_redundant_navigations(steps: List[Any]) -> List[Any]:

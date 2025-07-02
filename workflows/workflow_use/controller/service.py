@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 from typing import List, Optional
 
@@ -261,89 +262,156 @@ class WorkflowController(Controller):
 				
 				msg = f'🎯  Extracted DOM content: {extracted_data}'
 				logger.info(msg)
-				return ActionResult(extracted_content=extracted_data, include_in_memory=True)
+				return ActionResult(extracted_content=json.dumps(extracted_data), include_in_memory=True)
 				
 			except Exception as e:
 				error_msg = f'Failed to extract DOM content: {str(e)}'
 				logger.error(error_msg)
 				raise Exception(error_msg)
 
-		async def _extract_dom_elements(self, page, params: DOMExtractionAction, llm: BaseChatModel):
-			"""Core DOM extraction logic with structured field extraction."""
-			results = []
-			
-			# Find container elements
-			try:
-				containers = await page.query_selector_all(params.containerSelector)
-				if not containers:
-					raise Exception(f"No container elements found with selector: {params.containerSelector}")
-				
-				logger.info(f'Found {len(containers)} container elements')
-				
-				# If not multiple mode, take only first container
-				if not params.multiple:
-					containers = containers[:1]
-				
-				# Extract data from each container
-				for container in containers:
-					container_data = {}
-					
-					# Extract each field
-					for field in params.fields:
-						field_value = await self._extract_field_value(container, field, params.excludeSelectors)
-						container_data[field.name] = field_value
-					
-					results.append(container_data)
-				
-				return results[0] if len(results) == 1 else results
-				
-			except Exception as e:
-				logger.error(f'DOM extraction failed: {e}')
-				raise Exception(f"DOM extraction failed: {str(e)}")
+	async def _extract_dom_elements(self, page, params: DOMExtractionAction, llm: BaseChatModel):
+		"""Core DOM extraction logic with structured field extraction."""
+		results = []
 		
-		async def _extract_field_value(self, container, field: DOMExtractionField, exclude_selectors: Optional[List[str]] = None):
-			"""Extract value for a specific field from a container element."""
-			try:
-				# Find the field element within the container
-				field_element = await container.query_selector(field.selector)
-				if not field_element:
-					logger.warning(f'Field element not found with selector: {field.selector}')
-					return None
+		# Find container elements
+		try:
+			containers = await page.query_selector_all(params.containerSelector)
+			if not containers:
+				raise Exception(f"No container elements found with selector: {params.containerSelector}")
+			
+			logger.info(f'Found {len(containers)} container elements')
+			
+			# If not multiple mode, take only first container
+			if not params.multiple:
+				containers = containers[:1]
+			
+			# Extract data from each container
+			for container in containers:
+				container_data = {}
 				
-				# Check if element should be excluded
-				if exclude_selectors:
-					for exclude_selector in exclude_selectors:
+				# Extract each field
+				for field in params.fields:
+					field_value = await self._extract_field_value(container, field, params.excludeSelectors)
+					container_data[field.name] = field_value
+			
+				results.append(container_data)
+			
+			return results[0] if len(results) == 1 else results
+			
+		except Exception as e:
+			logger.error(f'DOM extraction failed: {e}')
+			raise Exception(f"DOM extraction failed: {str(e)}")
+	
+	async def _extract_field_value(self, container, field: DOMExtractionField, exclude_selectors: Optional[List[str]] = None):
+		"""Extract value for a specific field from a container element with fallback strategies."""
+		try:
+			# Primary selector attempt
+			field_element = await self._find_field_element_with_fallback(container, field)
+			if not field_element:
+				logger.warning(f'Field element not found with selector: {field.selector}')
+				return None
+			
+			# Check if element should be excluded
+			if exclude_selectors:
+				for exclude_selector in exclude_selectors:
+					try:
 						if await field_element.query_selector(exclude_selector):
 							logger.info(f'Field element excluded by selector: {exclude_selector}')
 							return None
-				
-				# Extract value based on field type
-				if field.type == 'text':
-					return await field_element.inner_text()
-				elif field.type == 'href':
-					return await field_element.get_attribute('href')
-				elif field.type == 'src':
-					return await field_element.get_attribute('src')
-				elif field.type == 'attribute' and field.attribute:
-					return await field_element.get_attribute(field.attribute)
-				else:
-					return await field_element.inner_text()  # Default to text
-					
-			except Exception as e:
-				logger.warning(f'Failed to extract field {field.name}: {e}')
-				return None
-
-		async def _extract_element_content(self, element):
-			"""Extract content from a single element - returns both text and HTML for LLM processing."""
-			# For intelligent extraction, always get the full HTML content
-			# The LLM will determine what to extract based on the natural language rule
-			return await element.inner_html()
-
-		async def _parse_complex_content(self, html_contents, goal, llm):
-			"""Use LLM to parse complex HTML structure and extract structured data."""
-			combined_html = '\n'.join(str(content) for content in html_contents)
+					except Exception:
+						# Ignore invalid exclude selectors
+						continue
 			
-			prompt = """
+			# Extract value based on field type
+			if field.type == 'text':
+				return await field_element.inner_text()
+			elif field.type == 'href':
+				return await field_element.get_attribute('href')
+			elif field.type == 'src':
+				return await field_element.get_attribute('src')
+			elif field.type == 'attribute' and field.attribute:
+				return await field_element.get_attribute(field.attribute)
+			else:
+				return await field_element.inner_text()  # Default to text
+				
+		except Exception as e:
+			logger.warning(f'Failed to extract field {field.name}: {e}')
+			return None
+	
+	async def _find_field_element_with_fallback(self, container, field: DOMExtractionField):
+		"""Find field element with multiple fallback strategies."""
+		# Strategy 1: Try original selector
+		try:
+			element = await container.query_selector(field.selector)
+			if element:
+				return element
+		except Exception as e:
+			logger.warning(f'Primary selector failed for {field.name}: {e}')
+		
+		# Strategy 2: Try fallback selectors based on field name
+		fallback_selectors = self._generate_fallback_selectors(field.name)
+		for fallback_selector in fallback_selectors:
+			try:
+				element = await container.query_selector(fallback_selector)
+				if element:
+					logger.info(f'Fallback selector worked for {field.name}: {fallback_selector}')
+					return element
+			except Exception:
+				continue
+		
+		return None
+	
+	def _generate_fallback_selectors(self, field_name: str) -> List[str]:
+		"""Generate fallback selectors based on common patterns."""
+		fallback_selectors = []
+		
+		# Common patterns for different field types
+		if 'author' in field_name.lower():
+			fallback_selectors.extend([
+				'[class*="author"]', '[id*="author"]', 
+				'span[class*="author"]', 'div[class*="author"]',
+				'.author', '#author'
+			])
+		elif 'year' in field_name.lower() or 'publish' in field_name.lower():
+			fallback_selectors.extend([
+				'[class*="year"]', '[class*="publish"]', '[class*="date"]',
+				'span[class*="year"]', 'span[class*="publish"]',
+				'.year', '.publish-year', '.date'
+			])
+		elif 'page' in field_name.lower():
+			fallback_selectors.extend([
+				'[class*="page"]', '[class*="length"]',
+				'span[class*="page"]', 'div[class*="page"]',
+				'.pages', '.page-count'
+			])
+		elif 'rating' in field_name.lower() or 'score' in field_name.lower():
+			fallback_selectors.extend([
+				'[class*="rating"]', '[class*="score"]', '[class*="star"]',
+				'span[class*="rating"]', 'div[class*="score"]',
+				'.rating', '.score', '.stars'
+			])
+		
+		# Generic patterns
+		fallback_selectors.extend([
+			f'[class*="{field_name.lower()}"]',
+			f'[id*="{field_name.lower()}"]',
+			f'span[class*="{field_name.lower()}"]',
+			f'div[class*="{field_name.lower()}"]'
+		])
+		
+		return fallback_selectors
+
+	async def _extract_element_content(self, element):
+		"""Extract content from a single element - returns both text and HTML for LLM processing."""
+		# For intelligent extraction, always get the full HTML content
+		# The LLM will determine what to extract based on the natural language rule
+		return await element.inner_html()
+
+	async def _parse_complex_content(self, html_contents, goal, llm):
+		"""Use LLM to parse complex HTML structure and extract structured data."""
+		combined_html = '\n'.join(str(content) for content in html_contents)
+		
+		prompt = """
 You are tasked with extracting structured information from HTML content.
 
 HTML Content:
@@ -359,17 +427,17 @@ Focus on extracting:
 
 Return only the JSON data, no explanation.
 """
-			
-			template = PromptTemplate(input_variables=['html_content', 'goal'], template=prompt)
-			
+		
+		template = PromptTemplate(input_variables=['html_content', 'goal'], template=prompt)
+		
+		try:
+			response = await llm.ainvoke(template.format(html_content=combined_html, goal=goal))
+			# Try to parse as JSON, fall back to text if parsing fails
+			import json
 			try:
-				response = await llm.ainvoke(template.format(html_content=combined_html, goal=goal))
-				# Try to parse as JSON, fall back to text if parsing fails
-				import json
-				try:
-					return json.loads(response.content)
-				except json.JSONDecodeError:
-					return response.content
-			except Exception as e:
-				logger.warning(f'LLM parsing failed: {e}')
-				return html_contents
+				return json.loads(response.content)
+			except json.JSONDecodeError:
+				return response.content
+		except Exception as e:
+			logger.warning(f'LLM parsing failed: {e}')
+			return html_contents
