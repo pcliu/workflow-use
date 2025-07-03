@@ -84,7 +84,8 @@ class PageExtractionAction(_BaseExtra):
 class DOMExtractionField(BaseModel):
 	"""Schema for individual fields to extract from DOM elements."""
 	name: str
-	selector: str
+	selector: Optional[str] = None
+	xpath: Optional[str] = None  # Support both CSS selector and XPath
 	type: Literal['text', 'href', 'src', 'attribute'] = 'text'
 	attribute: Optional[str] = None
 
@@ -93,9 +94,11 @@ class DOMExtractionAction(RecorderBase):
 	"""Parameters for extracting DOM content using structured field definitions."""
 
 	type: Literal['extract_dom_content']
-	containerSelector: str                        # CSS selector for container element
+	containerSelector: Optional[str] = None      # CSS selector for container element
+	containerXpath: Optional[str] = None         # XPath for container element (support both formats)
 	fields: List[DOMExtractionField]             # Structured field definitions
 	multiple: bool = False                       # Whether to extract multiple containers
 	excludeSelectors: Optional[List[str]] = None # CSS selectors to exclude
+	excludeXpaths: Optional[List[str]] = None    # XPath selectors to exclude
 	extractionRule: Optional[str] = None         # Original natural language rule (informational)
 	htmlSample: Optional[str] = None             # HTML sample for reference (informational)
