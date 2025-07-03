@@ -771,18 +771,7 @@ function markElementForSmartExtraction(
     // Visual feedback
     highlightMarkedElement(element);
     
-    // 1. Send content marking event (for BuilderService processing)
-    chrome.runtime.sendMessage({
-      type: 'MARK_CONTENT_FOR_EXTRACTION',
-      payload: {
-        timestamp: Date.now(),
-        url: document.location.href,
-        frameUrl: window.location.href,
-        ...markedElement
-      }
-    });
-    
-    // 2. Record as workflow step (for workflow execution)
+    // Record as workflow step (for workflow execution)
     const extractionStepData = {
       timestamp: Date.now(),
       url: document.location.href,
@@ -806,7 +795,6 @@ function markElementForSmartExtraction(
       payload: extractionStepData
     });
     
-    console.log('Marked element for smart extraction:', markedElement);
     console.log('Recorded extraction step:', extractionStepData);
     
   } catch (error) {

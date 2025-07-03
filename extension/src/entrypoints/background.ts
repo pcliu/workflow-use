@@ -23,7 +23,6 @@ import {
   HttpRecordingStartedEvent,
   HttpRecordingStoppedEvent,
   HttpWorkflowUpdateEvent,
-  HttpContentMarkingEvent,
   HttpCustomExtractionMarkedEvent,
 } from "../lib/message-bus-types";
 
@@ -500,22 +499,6 @@ export default defineBackground(() => {
       "CUSTOM_EXTRACTION_MARKED_EVENT",
     ];
     
-    // Handle DOM content marking events
-    if (message.type === "MARK_CONTENT_FOR_EXTRACTION") {
-      if (!isRecordingEnabled) {
-        return false; // Don't process if recording is disabled
-      }
-      
-      const eventToSend: HttpContentMarkingEvent = {
-        type: "MARK_CONTENT_FOR_EXTRACTION",
-        timestamp: Date.now(),
-        payload: message.payload,
-      };
-      sendEventToServer(eventToSend);
-      console.log("Forwarded content marking event to server:", message.payload);
-      return false;
-    }
-
     // Handle custom extraction marked events - send directly to server
     if (message.type === "CUSTOM_EXTRACTION_MARKED_EVENT") {
       if (!isRecordingEnabled) {
