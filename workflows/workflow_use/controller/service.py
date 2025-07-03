@@ -27,6 +27,32 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_ACTION_TIMEOUT_MS = 1000
 
+# Generic fallback patterns - avoid domain-specific assumptions
+GENERIC_SELECTOR_PATTERNS = [
+	'[class*="{field}"]',
+	'[id*="{field}"]', 
+	'span[class*="{field}"]',
+	'div[class*="{field}"]',
+	'.{field}',
+	'#{field}'
+]
+
+
+class TextElementWrapper:
+	"""Wrapper for text content to maintain compatibility with Playwright element interface."""
+	
+	def __init__(self, text: str):
+		self._text = text
+	
+	async def text_content(self) -> str:
+		return self._text
+	
+	async def inner_text(self) -> str:
+		return self._text
+	
+	async def get_attribute(self, name: str):
+		return self._text if name == 'textContent' else None
+
 # List of default actions from browser_use.controller.service.Controller to disable
 # todo: come up with a better way to filter out the actions (filter IN the actions would be much nicer in this case)
 DISABLED_DEFAULT_ACTIONS = [
@@ -330,6 +356,28 @@ class WorkflowController(Controller):
 				return f"//*[@id='{id_match.group(1)}']"
 		return xpath
 	
+	def _is_text_xpath(self, xpath: str) -> bool:
+		"""Check if XPath expression targets text nodes."""
+		return '/following-sibling::text()' in xpath or xpath.endswith('/text()')
+	
+	async def _extract_text_via_xpath(self, element, xpath: str):
+		"""Extract text content using native XPath evaluation."""
+		try:
+			result = await element.evaluate(f"""
+				(element) => {{
+					const xpath = {json.dumps(xpath)};
+					const result = document.evaluate(xpath, element, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+					return result.singleNodeValue ? result.singleNodeValue.textContent.trim() : null;
+				}}
+			""")
+			if result:
+				logger.debug(f'Extracted text from XPath {xpath}: {result}')
+				return [TextElementWrapper(result)]
+			return []
+		except Exception as e:
+			logger.error(f'XPath text extraction failed: {e}')
+			return []
+	
 	async def _query_elements_by_xpath(self, page, xpath: str):
 		"""Query elements using XPath with Playwright."""
 		try:
@@ -390,35 +438,13 @@ class WorkflowController(Controller):
 	async def _query_elements_by_xpath_relative(self, element, xpath: str):
 		"""Query elements using relative XPath from a given element."""
 		try:
-			# Handle special XPath patterns for text extraction
-			if '/following-sibling::text()' in xpath or xpath.endswith('/text()'):
-				# Use Playwright's evaluate to execute XPath that returns text nodes
-				result = await element.evaluate(f"""
-					(element) => {{
-						const xpath = {json.dumps(xpath)};
-						const result = document.evaluate(xpath, element, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
-						return result.singleNodeValue ? result.singleNodeValue.textContent.trim() : null;
-					}}
-				""")
-				if result:
-					logger.debug(f'Extracted text from XPath {xpath}: {result}')
-					# Create a wrapper that returns text content for compatibility
-					class TextWrapper:
-						def __init__(self, text):
-							self._text = text
-						async def text_content(self):
-							return self._text
-						async def inner_text(self):
-							return self._text
-						async def get_attribute(self, name):
-							return self._text if name == 'textContent' else None
-					return [TextWrapper(result)]
-				return []
+			if self._is_text_xpath(xpath):
+				# Handle XPath expressions that target text nodes
+				return await self._extract_text_via_xpath(element, xpath)
 			else:
-				# For regular XPath queries, use the element's locator
+				# Handle regular element XPath queries
 				locator = element.locator(f"xpath={xpath}")
-				elements = await locator.all()
-				return elements
+				return await locator.all()
 		except Exception as e:
 			logger.error(f'Relative XPath query failed: {e}')
 			return []
@@ -467,82 +493,23 @@ class WorkflowController(Controller):
 		return None
 	
 	def _generate_fallback_selectors(self, field_name: str) -> List[str]:
-		"""Generate fallback selectors based on common patterns."""
+		"""Generate generic fallback selectors based on field name patterns."""
 		fallback_selectors = []
 		
-		# Common patterns for different field types
-		if 'author' in field_name.lower():
-			fallback_selectors.extend([
-				'[class*="author"]', '[id*="author"]', 
-				'span[class*="author"]', 'div[class*="author"]',
-				'.author', '#author'
-			])
-		elif 'year' in field_name.lower() or 'publish' in field_name.lower():
-			fallback_selectors.extend([
-				'[class*="year"]', '[class*="publish"]', '[class*="date"]',
-				'span[class*="year"]', 'span[class*="publish"]',
-				'.year', '.publish-year', '.date'
-			])
-		elif 'page' in field_name.lower():
-			fallback_selectors.extend([
-				'[class*="page"]', '[class*="length"]',
-				'span[class*="page"]', 'div[class*="page"]',
-				'.pages', '.page-count'
-			])
-		elif 'rating' in field_name.lower() or 'score' in field_name.lower():
-			fallback_selectors.extend([
-				'[class*="rating"]', '[class*="score"]', '[class*="star"]',
-				'span[class*="rating"]', 'div[class*="score"]',
-				'.rating', '.score', '.stars'
-			])
+		# Normalize field name (handle underscores and mixed case)
+		normalized_field = field_name.lower().replace('_', '-')
 		
-		# Generic patterns
-		fallback_selectors.extend([
-			f'[class*="{field_name.lower()}"]',
-			f'[id*="{field_name.lower()}"]',
-			f'span[class*="{field_name.lower()}"]',
-			f'div[class*="{field_name.lower()}"]'
-		])
+		# Generate selectors using generic patterns
+		for pattern in GENERIC_SELECTOR_PATTERNS:
+			selector = pattern.format(field=normalized_field)
+			fallback_selectors.append(selector)
+		
+		# Also try original field name with underscores
+		if '_' in field_name:
+			original_field = field_name.lower()
+			for pattern in GENERIC_SELECTOR_PATTERNS:
+				selector = pattern.format(field=original_field)
+				fallback_selectors.append(selector)
 		
 		return fallback_selectors
 
-	async def _extract_element_content(self, element):
-		"""Extract content from a single element - returns both text and HTML for LLM processing."""
-		# For intelligent extraction, always get the full HTML content
-		# The LLM will determine what to extract based on the natural language rule
-		return await element.inner_html()
-
-	async def _parse_complex_content(self, html_contents, goal, llm):
-		"""Use LLM to parse complex HTML structure and extract structured data."""
-		combined_html = '\n'.join(str(content) for content in html_contents)
-		
-		prompt = """
-You are tasked with extracting structured information from HTML content.
-
-HTML Content:
-{html_content}
-
-Extraction Goal: {goal}
-
-Please extract the relevant information and return it as structured JSON. 
-Focus on extracting:
-- Individual fields (scores, dates, text content)
-- Maintain structure and relationships
-- Remove HTML tags but preserve meaningful content
-
-Return only the JSON data, no explanation.
-"""
-		
-		template = PromptTemplate(input_variables=['html_content', 'goal'], template=prompt)
-		
-		try:
-			response = await llm.ainvoke(template.format(html_content=combined_html, goal=goal))
-			# Try to parse as JSON, fall back to text if parsing fails
-			import json
-			try:
-				return json.loads(response.content)
-			except json.JSONDecodeError:
-				return response.content
-		except Exception as e:
-			logger.warning(f'LLM parsing failed: {e}')
-			return html_contents
