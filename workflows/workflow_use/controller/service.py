@@ -390,10 +390,35 @@ class WorkflowController(Controller):
 	async def _query_elements_by_xpath_relative(self, element, xpath: str):
 		"""Query elements using relative XPath from a given element."""
 		try:
-			# For relative XPath queries, we need to use the element's locator
-			locator = element.locator(f"xpath={xpath}")
-			elements = await locator.all()
-			return elements
+			# Handle special XPath patterns for text extraction
+			if '/following-sibling::text()' in xpath or xpath.endswith('/text()'):
+				# Use Playwright's evaluate to execute XPath that returns text nodes
+				result = await element.evaluate(f"""
+					(element) => {{
+						const xpath = {json.dumps(xpath)};
+						const result = document.evaluate(xpath, element, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+						return result.singleNodeValue ? result.singleNodeValue.textContent.trim() : null;
+					}}
+				""")
+				if result:
+					logger.debug(f'Extracted text from XPath {xpath}: {result}')
+					# Create a wrapper that returns text content for compatibility
+					class TextWrapper:
+						def __init__(self, text):
+							self._text = text
+						async def text_content(self):
+							return self._text
+						async def inner_text(self):
+							return self._text
+						async def get_attribute(self, name):
+							return self._text if name == 'textContent' else None
+					return [TextWrapper(result)]
+				return []
+			else:
+				# For regular XPath queries, use the element's locator
+				locator = element.locator(f"xpath={xpath}")
+				elements = await locator.all()
+				return elements
 		except Exception as e:
 			logger.error(f'Relative XPath query failed: {e}')
 			return []
