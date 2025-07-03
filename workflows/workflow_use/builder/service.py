@@ -167,7 +167,7 @@ class BuilderService:
 			# Prepare the prompt using LangChain PromptTemplate
 			prompt_inputs = {
 				'extraction_rule': extraction_rule,
-				'html_sample': html_sample[:2000],  # Limit HTML sample size
+				'html_sample': html_sample,  # Limit HTML sample size
 				'multiple': multiple,
 				'container_xpath': container_xpath
 			}

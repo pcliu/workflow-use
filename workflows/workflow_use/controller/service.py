@@ -42,16 +42,13 @@ class TextElementWrapper:
 	"""Wrapper for text content to maintain compatibility with Playwright element interface."""
 	
 	def __init__(self, text: str):
-		self._text = text
-	
-	async def text_content(self) -> str:
-		return self._text
+		self._text = text.strip()
 	
 	async def inner_text(self) -> str:
 		return self._text
 	
 	async def get_attribute(self, name: str):
-		return self._text if name == 'textContent' else None
+		return self._text if name in ['textContent', 'innerText'] else None
 
 # List of default actions from browser_use.controller.service.Controller to disable
 # todo: come up with a better way to filter out the actions (filter IN the actions would be much nicer in this case)
@@ -356,26 +353,53 @@ class WorkflowController(Controller):
 				return f"//*[@id='{id_match.group(1)}']"
 		return xpath
 	
+	async def _extract_text_content(self, element) -> str:
+		"""Extract text content from any element type."""
+		if isinstance(element, TextElementWrapper):
+			return await element.inner_text()
+		return (await element.inner_text()).strip()
+	
 	def _is_text_xpath(self, xpath: str) -> bool:
-		"""Check if XPath expression targets text nodes."""
-		return '/following-sibling::text()' in xpath or xpath.endswith('/text()')
+		"""Check if XPath expression targets text nodes or attributes."""
+		return ('/following-sibling::text()' in xpath or 
+				xpath.endswith('/text()') or 
+				'/@' in xpath)
 	
 	async def _extract_text_via_xpath(self, element, xpath: str):
-		"""Extract text content using native XPath evaluation."""
+		"""Extract text content or attribute values using native XPath evaluation."""
 		try:
+			logger.info(f'🔍 Extracting via XPath: {xpath}')
+			
+			# Get element HTML for debugging
+			element_html = await element.evaluate("(element) => element.outerHTML.substring(0, 300)")
+			logger.info(f'🔍 Element HTML: {element_html}')
+			
 			result = await element.evaluate(f"""
 				(element) => {{
 					const xpath = {json.dumps(xpath)};
-					const result = document.evaluate(xpath, element, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
-					return result.singleNodeValue ? result.singleNodeValue.textContent.trim() : null;
+					
+					// For attribute selectors, use STRING_TYPE for direct value extraction
+					if (xpath.includes('/@')) {{
+						const result = document.evaluate(xpath, element, null, XPathResult.STRING_TYPE, null);
+						return result.stringValue || null;
+					}} else {{
+						// For text nodes, use FIRST_ORDERED_NODE_TYPE
+						const result = document.evaluate(xpath, element, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+						return result.singleNodeValue ? result.singleNodeValue.textContent.trim() : null;
+					}}
 				}}
 			""")
+			
+			logger.info(f'🔍 XPath result: {result}')
+			
 			if result:
-				logger.debug(f'Extracted text from XPath {xpath}: {result}')
+				logger.info(f'✅ Extracted from XPath {xpath}: {result}')
 				return [TextElementWrapper(result)]
+			else:
+				logger.warning(f'❌ No result from XPath {xpath}')
 			return []
 		except Exception as e:
-			logger.error(f'XPath text extraction failed: {e}')
+			logger.error(f'XPath extraction failed: {e}')
 			return []
 	
 	async def _query_elements_by_xpath(self, page, xpath: str):
@@ -420,16 +444,18 @@ class WorkflowController(Controller):
 						continue
 			
 			# Extract value based on field type
-			if field.type == 'text':
-				return (await field_element.inner_text()).strip()
-			elif field.type == 'href':
+			if field.type == 'href':
 				return await field_element.get_attribute('href')
 			elif field.type == 'src':
 				return await field_element.get_attribute('src')
 			elif field.type == 'attribute' and field.attribute:
-				return await field_element.get_attribute(field.attribute)
-			else:
-				return (await field_element.inner_text()).strip()  # Default to text
+				# For TextElementWrapper (from XPath attribute extraction), return the text directly
+				if isinstance(field_element, TextElementWrapper):
+					return await self._extract_text_content(field_element)
+				else:
+					return await field_element.get_attribute(field.attribute)
+			else:  # 'text' or default
+				return await self._extract_text_content(field_element)
 				
 		except Exception as e:
 			logger.warning(f'Failed to extract field {field.name}: {e}')

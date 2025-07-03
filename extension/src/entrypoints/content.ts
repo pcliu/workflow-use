@@ -750,8 +750,8 @@ function markElementForSmartExtraction(
     const cssSelector = getEnhancedCSSSelector(element, xpath);
     
     // Capture HTML sample for LLM processing
-    const htmlSample = element.outerHTML.length > 2000 
-      ? element.outerHTML.substring(0, 2000) + '...'
+    const htmlSample = element.outerHTML.length > 10000 
+      ? element.outerHTML.substring(0, 10000) + '...'
       : element.outerHTML;
     
     const markedElement = {
