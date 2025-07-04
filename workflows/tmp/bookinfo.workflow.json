@@ -1,11 +1,11 @@
 {
-  "workflow_analysis": "The workflow involves navigating to DouBan's book page, searching for a specific book titled '\u4e00\u53e5\u9876\u4e00\u4e07\u53e5' and extracting specific information about the book including the author, publish year, pages, rating score, rating count, and short reviews. The steps involved in leaping over to the website, carrying out the search by typing and pressing 'Enter', and then navigating to specific pages to extract the necessary information. The whole process mimics a fairly straightforward data extraction task from a website after performing a search. Dynamic input such as the search term ('\u4e00\u53e5\u9876\u4e00\u4e07\u53e5') should be considered as a parameter to accommodate different search queries. The key tasks here primarily involve input operation for search, navigation to the right page, and data extraction once the target book is found. So, the input_schema will include a search_term to input different book names, authors or ISBNs. No dynamic or agentic selection is required as the targeted book information is extracted directly from a specified page layout without necessary user-driven reasoning or decision-making beyond selecting a search term.",
-  "name": "Douban Book Information Extraction",
-  "description": "Extracts basic information, rating details, and short commentaries for a book from Douban Books. Initial search is based on user input.",
+  "workflow_analysis": "This workflow is focused on retrieving book information from the Douban Books website. The task involves navigating to the website, searching for a specific book by its title, and extracting relevant details such as authorship, publication year, number of pages, ratings, and comments. It is designed to be flexible with the search term being provided as an input, allowing the user to search for any book they wish. The steps taken include navigating to the search page, entering the search term, and extracting the various pieces of information once the desired book's page is accessed. The workflow does not require any agentic steps since the search and extraction process involves deterministic operations, and content extraction components are well-defined in terms of DOM structure. The primary user input involved is the search term for the book they wish to gather information on.",
+  "name": "Douban_Book_Info_Extractor",
+  "description": "Extracts detailed information such as authorship, publication details, ratings, and user comments for a book from Douban.com",
   "version": "1.0",
   "steps": [
     {
-      "description": "Navigate to Douban Books homepage.",
+      "description": "Navigate to the Douban Books homepage.",
       "output": null,
       "timestamp": null,
       "tabId": null,
@@ -13,57 +13,67 @@
       "url": "https://book.douban.com/"
     },
     {
-      "description": "Enter the search term into the search input.",
+      "description": "Input the book title to search for.",
       "output": null,
       "timestamp": null,
       "tabId": null,
       "type": "input",
       "cssSelector": "input[id=\"inp-query\"][name=\"search_text\"][placeholder=\"\u4e66\u540d\u3001\u4f5c\u8005\u3001ISBN\"][autocomplete=\"off\"]",
       "value": "{search_term}",
-      "xpath": "id(\"inp-query\")",
-      "elementTag": "INPUT"
+      "xpath": null,
+      "elementTag": null
     },
     {
-      "description": "Submit the search term by pressing Enter.",
+      "description": "Press enter to submit the search.",
       "output": null,
       "timestamp": null,
       "tabId": null,
       "type": "key_press",
       "cssSelector": "input[id=\"inp-query\"][name=\"search_text\"][placeholder=\"\u4e66\u540d\u3001\u4f5c\u8005\u3001ISBN\"][autocomplete=\"off\"]",
       "key": "Enter",
-      "xpath": "id(\"inp-query\")",
-      "elementTag": "INPUT"
+      "xpath": null,
+      "elementTag": null
     },
     {
-      "description": "Select the specific book from the dynamic search results. As search results can vary, use agent to select the correct book.",
+      "description": "Select the specific book from the search results.",
       "output": null,
-      "type": "agent",
-      "task": "Select the book {search_term} from the search results",
-      "max_steps": 5
+      "timestamp": null,
+      "tabId": null,
+      "type": "click",
+      "cssSelector": "a.title-text[href=\"https://book.douban.com/subject/36062390/\"]",
+      "xpath": null,
+      "elementTag": null,
+      "elementText": null
     },
     {
-      "description": "Extract basic book information like author, year, and page count.",
+      "description": "Extract the author's name, publisher, publication year, and number of pages.",
       "output": null,
       "timestamp": null,
       "tabId": null,
       "type": "extract_dom_content",
-      "containerXpath": "//div[@id='info']",
+      "containerXpath": "id(\"info\")",
       "fields": [
         {
           "name": "author",
-          "xpath": ".//span[contains(text(), '\u4f5c\u8005')]/following-sibling::a[1]/text()",
+          "xpath": ".//span[span[contains(text(), '\u4f5c\u8005')]]/a/text()",
+          "type": "text",
+          "attribute": null
+        },
+        {
+          "name": "publisher",
+          "xpath": ".//span[text()='\u51fa\u7248\u793e:']/following-sibling::a/text()",
           "type": "text",
           "attribute": null
         },
         {
           "name": "publish_year",
-          "xpath": ".//span[contains(text(), '\u51fa\u7248\u5e74')]/following::text()[1]",
+          "xpath": ".//span[text()='\u51fa\u7248\u5e74:']/following-sibling::text()",
           "type": "text",
           "attribute": null
         },
         {
           "name": "pages",
-          "xpath": ".//span[contains(text(), '\u9875\u6570')]/following::text()[1]",
+          "xpath": ".//span[text()='\u9875\u6570:']/following-sibling::text()",
           "type": "text",
           "attribute": null
         }
@@ -74,22 +84,22 @@
       "htmlSample": null
     },
     {
-      "description": "Extract the book's rating score and number of ratings.",
+      "description": "Extract average rating and number of ratings.",
       "output": null,
       "timestamp": null,
       "tabId": null,
       "type": "extract_dom_content",
-      "containerXpath": ".id('interest_sectl')/div[1]",
+      "containerXpath": "id(\"interest_sectl\")/div[1]",
       "fields": [
         {
-          "name": "rating_score",
-          "xpath": ".//strong[@class='ll rating_num ' and @property='v:average']/text()",
+          "name": "average_rating",
+          "xpath": ".//strong[@class='ll rating_num ']/text()",
           "type": "text",
           "attribute": null
         },
         {
-          "name": "rating_count",
-          "xpath": ".//span[@property='v:votes']/text()",
+          "name": "rating_people",
+          "xpath": ".//a[@class='rating_people']/span/text()",
           "type": "text",
           "attribute": null
         }
@@ -100,27 +110,27 @@
       "htmlSample": null
     },
     {
-      "description": "Extract content, time, and ratings from each short review.",
+      "description": "Extract user comments, comment dates, and ratings per comment.",
       "output": null,
       "timestamp": null,
       "tabId": null,
       "type": "extract_dom_content",
-      "containerXpath": "//li[@class='comment-item']",
+      "containerXpath": "//div[@id='comments-section']//ul//li[contains(@class, 'comment-item')]",
       "fields": [
         {
-          "name": "content",
-          "xpath": ".//p[@class='comment-content']/span[@class='short']/text()",
+          "name": "comment_content",
+          "xpath": ".//p[contains(@class, 'comment-content')]//span[contains(@class, 'short')]/text()",
           "type": "text",
           "attribute": null
         },
         {
-          "name": "time",
-          "xpath": ".//span[@class='comment-info']/a[@class='comment-time']/text()",
+          "name": "comment_date",
+          "xpath": ".//a[contains(@class, 'comment-time')]/text()",
           "type": "text",
           "attribute": null
         },
         {
-          "name": "rating",
+          "name": "comment_rating",
           "xpath": ".//span[contains(@class, 'user-stars')]/@title",
           "type": "text",
           "attribute": null

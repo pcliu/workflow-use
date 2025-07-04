@@ -1,13 +1,96 @@
 import json as _json
 from inspect import Parameter, Signature
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List, Union
 
 from fastmcp import FastMCP
 from langchain_core.language_models.chat_models import BaseChatModel
 
 from workflow_use.schema.views import WorkflowDefinitionSchema
 from workflow_use.workflow.service import Workflow
+from workflow_use.workflow.views import WorkflowRunOutput
+
+
+def _extract_workflow_results(raw_result: WorkflowRunOutput) -> Dict[str, Any]:
+	"""Extract clean, user-friendly results from workflow execution."""
+	
+	# Initialize clean result structure
+	clean_result = {
+		"status": "success",
+		"data": {},
+		"error": None
+	}
+	
+	try:
+		# Use structured output model if available (highest priority)
+		if raw_result.output_model is not None:
+			if hasattr(raw_result.output_model, 'dict'):
+				clean_result["data"] = raw_result.output_model.dict()
+			else:
+				clean_result["data"] = raw_result.output_model
+		else:
+			# Extract data from step results
+			extracted_items = []
+			
+			# Process step results to find extracted content
+			for step_result in raw_result.step_results:
+				if hasattr(step_result, 'extracted_content') and step_result.extracted_content:
+					content = step_result.extracted_content
+					
+					# Skip technical operation logs (browser automation details)
+					if any(skip_phrase in content for skip_phrase in [
+						'Navigated to URL', 'Clicked element', 'Input ', 'Pressed key', 
+						'Scrolled page', 'Selected option', 'with CSS selector'
+					]):
+						continue
+					
+					# Try to parse JSON content (from extraction steps)
+					try:
+						if content.startswith('{') or content.startswith('['):
+							parsed_data = _json.loads(content)
+							extracted_items.append(parsed_data)
+						elif 'Extracted' in content and ('{' in content or '[' in content):
+							# Extract JSON from "Extracted DOM content: {...}" or similar formats
+							json_start = max(content.find('{'), content.find('['))
+							if json_start != -1:
+								json_content = content[json_start:]
+								parsed_data = _json.loads(json_content)
+								extracted_items.append(parsed_data)
+					except (_json.JSONDecodeError, ValueError):
+						# If not JSON but substantial content, store as text
+						content_cleaned = content.strip()
+						if len(content_cleaned) > 20 and not any(tech_word in content_cleaned.lower() for tech_word in [
+							'selector', 'xpath', 'css', 'element', 'clicked', 'navigated'
+						]):
+							extracted_items.append({"content": content_cleaned})
+			
+			# Organize extracted data
+			if len(extracted_items) == 1:
+				# Single extraction result
+				clean_result["data"] = extracted_items[0]
+			elif len(extracted_items) > 1:
+				# Multiple extraction results - use descriptive keys
+				clean_result["data"] = {"extracted_data": extracted_items}
+			else:
+				# No extracted data found
+				clean_result["data"] = {}
+		
+		# Check for any errors in step results
+		error_messages = []
+		for step_result in raw_result.step_results:
+			if hasattr(step_result, 'error') and step_result.error:
+				error_messages.append(str(step_result.error))
+		
+		if error_messages:
+			clean_result["status"] = "partial_success" if clean_result["data"] else "error"
+			clean_result["error"] = "; ".join(error_messages)
+			
+	except Exception as e:
+		clean_result["status"] = "error"
+		clean_result["error"] = f"Failed to process workflow results: {str(e)}"
+		clean_result["data"] = {}
+	
+	return clean_result
 
 
 def get_mcp_server(
@@ -75,11 +158,22 @@ def _setup_workflow_tools(
 			def create_runner(wf_instance: Workflow):
 				async def actual_workflow_runner(**kwargs):
 					# kwargs will be populated by FastMCP based on the dynamic_signature
-					raw_result = await wf_instance.run(inputs=kwargs)
 					try:
-						return _json.dumps(raw_result, default=str)
-					except Exception:
-						return str(raw_result)
+						raw_result = await wf_instance.run(inputs=kwargs)
+						
+						# Extract clean, user-friendly results
+						clean_result = _extract_workflow_results(raw_result)
+						
+						return _json.dumps(clean_result, ensure_ascii=False, indent=2)
+						
+					except Exception as e:
+						# Return structured error response
+						error_result = {
+							"status": "error",
+							"data": {},
+							"error": f"Workflow execution failed: {str(e)}"
+						}
+						return _json.dumps(error_result, ensure_ascii=False, indent=2)
 
 				return actual_workflow_runner
 
