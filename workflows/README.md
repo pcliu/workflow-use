@@ -102,18 +102,28 @@ Agentic Steps: agent (Browser Use), extract_page_content (LLM)
 
 **Key Capabilities:**
 ```python
-# Enhanced Browser Actions with Multi-Strategy Selection
-async def click(params: ClickElementDeterministicAction, browser_session: Browser):
-    # Multi-strategy element selection (XPath, CSS, fallback)
-    # Native browser element targeting with timeout handling
-    # Detailed logging and error reporting
+# Unified Element Action Execution with Performance Optimization
+async def _execute_element_action(self, browser_session, params, action_func, success_msg, error_msg):
+    # Centralized element selection and action execution
+    # Consistent error handling across all browser actions
+    # Optimized timeout handling and logging
+    # Support for custom action functions via lambda/callable patterns
 
-# Advanced DOM Content Extraction
+# Streamlined Browser Actions (click, input, select_change, key_press)
+async def click(params: ClickElementDeterministicAction, browser_session: Browser):
+    return await self._execute_element_action(
+        browser_session, params, lambda locator: locator.click(force=True),
+        '🖱️ Clicked element', 'Failed to click element'
+    )
+    # Reduced from ~20 lines to 4 lines per action
+    # Unified error handling and logging
+
+# Advanced DOM Content Extraction with Unified XPath Processing
 async def extract_dom_content(params: DOMExtractionAction, browser_session: Browser):
     # Native XPath evaluation with document.evaluate()
-    # Support for text nodes, attributes, and complex selectors
+    # Unified XPath query method for both page and element contexts
     # Intelligent XPath normalization (id() → //*[@id='...'])
-    # Multiple fallback strategies for robust element selection
+    # Cached fallback selector generation with @lru_cache
 
 # LLM-Powered Page Content Extraction
 async def extract_page_content(params: PageExtractionAction, browser_session: Browser):
@@ -278,7 +288,34 @@ class WorkflowController(BrowserController):
 
 ## Advanced Features
 
-### 1. Optimized LLM-Powered Workflow Building
+### 1. Unified Element Action Architecture
+**Performance-Optimized Browser Automation** with centralized action execution and reduced code duplication.
+
+```python
+# Before Optimization - Repetitive Pattern (5 similar methods, ~20-30 lines each)
+async def click(params, browser_session):
+    page = await browser_session.get_current_page()
+    original_selector = params.cssSelector
+    try:
+        locator, selector_used = await get_best_element_handle(...)
+        await locator.click(force=True)
+        msg = f'🖱️ Clicked element...'
+        logger.info(msg)
+        return ActionResult(extracted_content=msg, include_in_memory=True)
+    except Exception as e:
+        error_msg = f'Failed to click element...'
+        logger.error(error_msg)
+        raise Exception(error_msg)
+
+# After Optimization - Unified Pattern (DRY principle applied)
+async def click(params, browser_session):
+    return await self._execute_element_action(
+        browser_session, params, lambda locator: locator.click(force=True),
+        '🖱️ Clicked element', 'Failed to click element'
+    )
+```
+
+### 2. Optimized LLM-Powered Workflow Building
 **Performance-Enhanced Analysis** with caching, unified JSON parsing, and intelligent workflow generation.
 
 ```python
@@ -298,29 +335,38 @@ def _extract_json_from_response(self, response_text: str) -> str:
     # Single utility for all LLM response parsing needs
 ```
 
-### 2. Advanced DOM Content Extraction
-**Native XPath Evaluation** with intelligent normalization and multi-strategy selection.
+### 3. Advanced DOM Content Extraction
+**Native XPath Evaluation** with unified processing and performance optimization.
 
 ```python
-# Native Browser XPath Evaluation
-async def _extract_text_via_xpath(self, element, xpath: str):
-    # Uses document.evaluate() in browser context
-    # Supports text nodes (/text()), attributes (/@attr), and element queries
-    # Returns TextElementWrapper for unified handling
+# Unified XPath Query System
+async def _query_elements_by_xpath(self, context, xpath: str, is_relative: bool = False):
+    # Single method for both page-level and element-level XPath queries
+    # Automatic detection of text nodes and attribute XPath expressions
+    # Centralized error handling with context-aware logging
+    # Supports both absolute (//*[@id='...']) and relative (.//span) XPath
 
-# XPath Normalization and Validation
-def _normalize_xpath(self, xpath: str) -> str:
-    # Converts .id('info') → //*[@id='info']
-    # Handles various XPath format variations
-    
-# Multi-Strategy Element Selection
+# Streamlined Text Node Processing
+async def _find_elements_by_xpath(self, container, xpath: str):
+    # Unified handling for /text() suffix XPath expressions
+    # Eliminates duplicate logic between different XPath processing methods
+    # Consistent behavior for text node extraction
+
+# Performance-Optimized Fallback Selectors
+@lru_cache(maxsize=128)
+def _generate_fallback_selectors(self, field_name: str) -> Tuple[str, ...]:
+    # Cached fallback selector generation to avoid repeated computation
+    # Tuple return type for immutability and hashability
+    # Support for both underscore and hyphen field name variations
+
+# Simplified Multi-Strategy Element Selection
 async def _find_field_element_with_fallback(self, container, field):
-    # 1. Try XPath (with text node support)
-    # 2. Try CSS selector fallback
-    # 3. Try generated fallback selectors based on field name
+    # 1. Unified XPath processing (replaces complex if-else logic)
+    # 2. CSS selector fallback with consistent error handling
+    # 3. Cached fallback selectors based on field name patterns
 ```
 
-### 3. Enhanced Self-Healing Execution
+### 4. Enhanced Self-Healing Execution
 **Intelligent Element Selection** with native XPath evaluation and fallback strategies.
 
 ```python
@@ -340,7 +386,7 @@ def _is_text_xpath(self, xpath: str) -> bool:
     # Ensures proper evaluation strategy selection
 ```
 
-### 4. Structured Content Extraction
+### 5. Structured Content Extraction
 **LLM-Powered Content Understanding** with Pydantic schema validation.
 
 ```python

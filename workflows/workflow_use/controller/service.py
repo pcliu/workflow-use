@@ -2,7 +2,8 @@ import asyncio
 import json
 import logging
 import re
-from typing import List, Optional
+from functools import lru_cache
+from typing import List, Optional, Tuple, Any, Callable
 
 from browser_use import Browser
 from browser_use.agent.views import ActionResult
@@ -108,25 +109,11 @@ class WorkflowController(Controller):
 		)
 		async def click(params: ClickElementDeterministicAction, browser_session: Browser) -> ActionResult:
 			"""Click the first element matching *params.cssSelector* with fallback mechanisms."""
-			page = await browser_session.get_current_page()
-			original_selector = params.cssSelector
-
-			try:
-				locator, selector_used = await get_best_element_handle(
-					page,
-					params.cssSelector,
-					params,
-					timeout_ms=DEFAULT_ACTION_TIMEOUT_MS,
-				)
-				await locator.click(force=True)
-
-				msg = f'🖱️  Clicked element with CSS selector: {truncate_selector(selector_used)} (original: {truncate_selector(original_selector)})'
-				logger.info(msg)
-				return ActionResult(extracted_content=msg, include_in_memory=True)
-			except Exception as e:
-				error_msg = f'Failed to click element. Original selector: {truncate_selector(original_selector)}. Error: {str(e)}'
-				logger.error(error_msg)
-				raise Exception(error_msg)
+			return await self._execute_element_action(
+				browser_session, params, 
+				lambda locator: locator.click(force=True),
+				'🖱️  Clicked element', 'Failed to click element'
+			)
 
 		# Input text into element --------------------------------------------------------
 		@self.registry.action(
@@ -139,17 +126,7 @@ class WorkflowController(Controller):
 			has_sensitive_data: bool = False,
 		) -> ActionResult:
 			"""Fill text into the element located with *params.cssSelector*."""
-			page = await browser_session.get_current_page()
-			original_selector = params.cssSelector
-
-			try:
-				locator, selector_used = await get_best_element_handle(
-					page,
-					params.cssSelector,
-					params,
-					timeout_ms=DEFAULT_ACTION_TIMEOUT_MS,
-				)
-
+			async def input_action(locator):
 				# Check if it's a SELECT element
 				is_select = await locator.evaluate('(el) => el.tagName === "SELECT"')
 				if is_select:
@@ -157,20 +134,24 @@ class WorkflowController(Controller):
 						extracted_content='Ignored input into select element',
 						include_in_memory=True,
 					)
-
-				# Add a small delay and click to ensure the element is focused
+				
+				# Fill text with focus handling
 				await locator.fill(params.value)
 				await asyncio.sleep(0.5)
 				await locator.click(force=True)
 				await asyncio.sleep(0.5)
-
-				msg = f'⌨️  Input "{params.value}" into element with CSS selector: {truncate_selector(selector_used)} (original: {truncate_selector(original_selector)})'
-				logger.info(msg)
-				return ActionResult(extracted_content=msg, include_in_memory=True)
-			except Exception as e:
-				error_msg = f'Failed to input text. Original selector: {truncate_selector(original_selector)}. Error: {str(e)}'
-				logger.error(error_msg)
-				raise Exception(error_msg)
+				return None  # Continue with normal flow
+			
+			result = await self._execute_element_action(
+				browser_session, params, input_action,
+				f'⌨️  Input "{params.value}" into element', 'Failed to input text'
+			)
+			
+			# Handle early return from input_action
+			if isinstance(result.extracted_content, str) and 'Ignored input' in result.extracted_content:
+				return result
+				
+			return result
 
 		# Select dropdown option ---------------------------------------------------------
 		@self.registry.action(
@@ -179,26 +160,11 @@ class WorkflowController(Controller):
 		)
 		async def select_change(params: SelectDropdownOptionDeterministicAction, browser_session: Browser) -> ActionResult:
 			"""Select dropdown option whose visible text equals *params.value*."""
-			page = await browser_session.get_current_page()
-			original_selector = params.cssSelector
-
-			try:
-				locator, selector_used = await get_best_element_handle(
-					page,
-					params.cssSelector,
-					params,
-					timeout_ms=DEFAULT_ACTION_TIMEOUT_MS,
-				)
-
-				await locator.select_option(label=params.selectedText)
-
-				msg = f'Selected option "{params.selectedText}" in dropdown {truncate_selector(selector_used)} (original: {truncate_selector(original_selector)})'
-				logger.info(msg)
-				return ActionResult(extracted_content=msg, include_in_memory=True)
-			except Exception as e:
-				error_msg = f'Failed to select option. Original selector: {truncate_selector(original_selector)}. Error: {str(e)}'
-				logger.error(error_msg)
-				raise Exception(error_msg)
+			return await self._execute_element_action(
+				browser_session, params,
+				lambda locator: locator.select_option(label=params.selectedText),
+				f'Selected option "{params.selectedText}" in dropdown', 'Failed to select option'
+			)
 
 		# Key press action ------------------------------------------------------------
 		@self.registry.action(
@@ -207,21 +173,12 @@ class WorkflowController(Controller):
 		)
 		async def key_press(params: KeyPressDeterministicAction, browser_session: Browser) -> ActionResult:
 			"""Press *params.key* on the element identified by *params.cssSelector*."""
-			page = await browser_session.get_current_page()
-			original_selector = params.cssSelector
-
-			try:
-				locator, selector_used = await get_best_element_handle(page, params.cssSelector, params, timeout_ms=5000)
-
-				await locator.press(params.key)
-
-				msg = f"🔑  Pressed key '{params.key}' on element with CSS selector: {truncate_selector(selector_used)} (original: {truncate_selector(original_selector)})"
-				logger.info(msg)
-				return ActionResult(extracted_content=msg, include_in_memory=True)
-			except Exception as e:
-				error_msg = f'Failed to press key. Original selector: {truncate_selector(original_selector)}. Error: {str(e)}'
-				logger.error(error_msg)
-				raise Exception(error_msg)
+			return await self._execute_element_action(
+				browser_session, params,
+				lambda locator: locator.press(params.key),
+				f"🔑  Pressed key '{params.key}' on element", 'Failed to press key',
+				timeout_ms=5000
+			)
 
 		# Scroll action --------------------------------------------------------------
 		@self.registry.action('Scroll page', param_model=ScrollDeterministicAction)
@@ -368,11 +325,7 @@ class WorkflowController(Controller):
 	async def _extract_text_via_xpath(self, element, xpath: str):
 		"""Extract text content or attribute values using native XPath evaluation."""
 		try:
-			logger.info(f'🔍 Extracting via XPath: {xpath}')
-			
-			# Get element HTML for debugging
-			element_html = await element.evaluate("(element) => element.outerHTML.substring(0, 300)")
-			logger.info(f'🔍 Element HTML: {element_html}')
+			logger.debug(f'Extracting via XPath: {xpath}')
 			
 			result = await element.evaluate(f"""
 				(element) => {{
@@ -390,27 +343,33 @@ class WorkflowController(Controller):
 				}}
 			""")
 			
-			logger.info(f'🔍 XPath result: {result}')
-			
 			if result:
-				logger.info(f'✅ Extracted from XPath {xpath}: {result}')
+				logger.debug(f'Extracted from XPath {xpath}: {result[:100] if len(str(result)) > 100 else result}')
 				return [TextElementWrapper(result)]
-			else:
-				logger.warning(f'❌ No result from XPath {xpath}')
 			return []
 		except Exception as e:
 			logger.error(f'XPath extraction failed: {e}')
 			return []
 	
-	async def _query_elements_by_xpath(self, page, xpath: str):
-		"""Query elements using XPath with Playwright."""
+	async def _query_elements_by_xpath(self, context, xpath: str, is_relative: bool = False):
+		"""Unified XPath query method for both page and element contexts."""
 		try:
-			# Use Playwright's locator with XPath
-			locator = page.locator(f"xpath={xpath}")
+			# Handle text node and attribute XPath expressions
+			if self._is_text_xpath(xpath):
+				if is_relative:
+					return await self._extract_text_via_xpath(context, xpath)
+				else:
+					# For page-level text XPath, need element context first
+					logger.warning(f'Text XPath requires element context: {xpath}')
+					return []
+			
+			# Regular element XPath queries
+			locator = context.locator(f"xpath={xpath}")
 			elements = await locator.all()
 			return elements
 		except Exception as e:
-			logger.error(f'XPath query failed: {e}')
+			context_type = 'relative' if is_relative else 'absolute'
+			logger.error(f'{context_type.capitalize()} XPath query failed: {e}')
 			return []
 	
 	async def _extract_field_value(self, container, field: DOMExtractionField, exclude_selectors: Optional[List[str]] = None):
@@ -463,36 +422,18 @@ class WorkflowController(Controller):
 	
 	async def _query_elements_by_xpath_relative(self, element, xpath: str):
 		"""Query elements using relative XPath from a given element."""
-		try:
-			if self._is_text_xpath(xpath):
-				# Handle XPath expressions that target text nodes
-				return await self._extract_text_via_xpath(element, xpath)
-			else:
-				# Handle regular element XPath queries
-				locator = element.locator(f"xpath={xpath}")
-				return await locator.all()
-		except Exception as e:
-			logger.error(f'Relative XPath query failed: {e}')
-			return []
+		return await self._query_elements_by_xpath(element, xpath, is_relative=True)
 	
 	async def _find_field_element_with_fallback(self, container, field: DOMExtractionField):
 		"""Find field element with multiple fallback strategies supporting both XPath and CSS."""
 		# Strategy 1: Try XPath if available
 		if hasattr(field, 'xpath') and field.xpath:
 			try:
-				# Handle XPath that extracts text directly (ends with /text())
 				xpath = field.xpath
-				if xpath.endswith('/text()'):
-					# For text() XPath, we need to evaluate and return the text content
-					xpath_element = xpath[:-7]  # Remove /text() suffix
-					elements = await self._query_elements_by_xpath_relative(container, xpath_element)
-					if elements:
-						return elements[0]  # Return first matching element
-				else:
-					# Regular XPath for elements
-					elements = await self._query_elements_by_xpath_relative(container, xpath)
-					if elements:
-						return elements[0]
+				# Use unified XPath query method
+				elements = await self._find_elements_by_xpath(container, xpath)
+				if elements:
+					return elements[0]
 			except Exception as e:
 				logger.warning(f'XPath selector failed for {field.name}: {e}')
 		
@@ -518,7 +459,8 @@ class WorkflowController(Controller):
 		
 		return None
 	
-	def _generate_fallback_selectors(self, field_name: str) -> List[str]:
+	@lru_cache(maxsize=128)
+	def _generate_fallback_selectors(self, field_name: str) -> Tuple[str, ...]:
 		"""Generate generic fallback selectors based on field name patterns."""
 		fallback_selectors = []
 		
@@ -537,5 +479,51 @@ class WorkflowController(Controller):
 				selector = pattern.format(field=original_field)
 				fallback_selectors.append(selector)
 		
-		return fallback_selectors
+		return tuple(fallback_selectors)
+
+	async def _find_elements_by_xpath(self, container, xpath: str):
+		"""Unified method to find elements by XPath with text node handling."""
+		# Handle XPath that extracts text directly (ends with /text())
+		if xpath.endswith('/text()'):
+			# For text() XPath, we need to evaluate and return the text content  
+			xpath_element = xpath[:-7]  # Remove /text() suffix
+			elements = await self._query_elements_by_xpath_relative(container, xpath_element)
+			return elements
+		else:
+			# Regular XPath for elements
+			return await self._query_elements_by_xpath_relative(container, xpath)
+
+	async def _execute_element_action(
+		self, 
+		browser_session: Browser, 
+		params: Any, 
+		action_func: Callable, 
+		success_msg: str, 
+		error_msg: str,
+		timeout_ms: int = DEFAULT_ACTION_TIMEOUT_MS
+	) -> ActionResult:
+		"""Common pattern for executing element-based actions with consistent error handling."""
+		page = await browser_session.get_current_page()
+		original_selector = params.cssSelector
+
+		try:
+			locator, selector_used = await get_best_element_handle(
+				page, params.cssSelector, params, timeout_ms=timeout_ms
+			)
+			
+			# Execute the action function
+			action_result = await action_func(locator)
+			
+			# Handle early returns from action function
+			if isinstance(action_result, ActionResult):
+				return action_result
+
+			msg = f'{success_msg} with CSS selector: {truncate_selector(selector_used)} (original: {truncate_selector(original_selector)})'
+			logger.info(msg)
+			return ActionResult(extracted_content=msg, include_in_memory=True)
+			
+		except Exception as e:
+			full_error_msg = f'{error_msg}. Original selector: {truncate_selector(original_selector)}. Error: {str(e)}'
+			logger.error(full_error_msg)
+			raise Exception(full_error_msg)
 
