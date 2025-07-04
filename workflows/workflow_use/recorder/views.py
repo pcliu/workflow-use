@@ -1,4 +1,4 @@
-from typing import Any, Dict, Literal, Union
+from typing import Literal, Union
 
 from pydantic import BaseModel
 
@@ -33,15 +33,9 @@ class HttpRecordingStoppedEvent(BaseHttpEvent):
 	payload: RecordingStatusPayload
 
 
-class HttpCustomExtractionMarkedEvent(BaseHttpEvent):
-	type: Literal['CUSTOM_EXTRACTION_MARKED_EVENT'] = 'CUSTOM_EXTRACTION_MARKED_EVENT'
-	payload: Dict[str, Any]  # Contains extraction data from extension
-
-
 # Union of all possible event types received by the recorder
 RecorderEvent = Union[
 	HttpWorkflowUpdateEvent,
 	HttpRecordingStartedEvent,
 	HttpRecordingStoppedEvent,
-	HttpCustomExtractionMarkedEvent,
 ]

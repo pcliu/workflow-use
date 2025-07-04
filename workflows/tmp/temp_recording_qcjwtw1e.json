@@ -1,0 +1,274 @@
+{
+  "workflow_analysis": null,
+  "name": "Recorded Workflow",
+  "description": "Recorded on 2025/7/3 17:52:46",
+  "version": "1.0.0",
+  "steps": [
+    {
+      "description": null,
+      "output": null,
+      "timestamp": 1751536286123,
+      "tabId": 1520015156,
+      "type": "navigation",
+      "url": "https://book.douban.com/"
+    },
+    {
+      "description": null,
+      "output": null,
+      "timestamp": 1751536288677,
+      "tabId": 1520015156,
+      "type": "click",
+      "cssSelector": "input[id=\"inp-query\"][name=\"search_text\"][placeholder=\"书名、作者、ISBN\"][autocomplete=\"off\"]",
+      "xpath": "id(\"inp-query\")",
+      "elementTag": "INPUT",
+      "elementText": "",
+      "url": "https://book.douban.com/",
+      "frameUrl": "https://book.douban.com/"
+    },
+    {
+      "description": null,
+      "output": null,
+      "timestamp": 1751536289790,
+      "tabId": 1520015156,
+      "type": "input",
+      "cssSelector": "input[id=\"inp-query\"][name=\"search_text\"][placeholder=\"书名、作者、ISBN\"][autocomplete=\"off\"]",
+      "value": "yi",
+      "xpath": "id(\"inp-query\")",
+      "elementTag": "INPUT",
+      "url": "https://book.douban.com/",
+      "frameUrl": "https://book.douban.com/"
+    },
+    {
+      "description": null,
+      "output": null,
+      "timestamp": 1751536290222,
+      "tabId": 1520015156,
+      "type": "key_press",
+      "cssSelector": "input[id=\"inp-query\"][name=\"search_text\"][placeholder=\"书名、作者、ISBN\"][autocomplete=\"off\"]",
+      "key": "Backspace",
+      "xpath": "id(\"inp-query\")",
+      "elementTag": "INPUT",
+      "url": "https://book.douban.com/",
+      "frameUrl": "https://book.douban.com/"
+    },
+    {
+      "description": null,
+      "output": null,
+      "timestamp": 1751536290224,
+      "tabId": 1520015156,
+      "type": "input",
+      "cssSelector": "input[id=\"inp-query\"][name=\"search_text\"][placeholder=\"书名、作者、ISBN\"][autocomplete=\"off\"]",
+      "value": "y",
+      "xpath": "id(\"inp-query\")",
+      "elementTag": "INPUT",
+      "url": "https://book.douban.com/",
+      "frameUrl": "https://book.douban.com/"
+    },
+    {
+      "description": null,
+      "output": null,
+      "timestamp": 1751536290341,
+      "tabId": 1520015156,
+      "type": "key_press",
+      "cssSelector": "input[id=\"inp-query\"][name=\"search_text\"][placeholder=\"书名、作者、ISBN\"][autocomplete=\"off\"]",
+      "key": "Backspace",
+      "xpath": "id(\"inp-query\")",
+      "elementTag": "INPUT",
+      "url": "https://book.douban.com/",
+      "frameUrl": "https://book.douban.com/"
+    },
+    {
+      "description": null,
+      "output": null,
+      "timestamp": 1751536293975,
+      "tabId": 1520015156,
+      "type": "input",
+      "cssSelector": "input[id=\"inp-query\"][name=\"search_text\"][placeholder=\"书名、作者、ISBN\"][autocomplete=\"off\"]",
+      "value": "一句顶一万句",
+      "xpath": "id(\"inp-query\")",
+      "elementTag": "INPUT",
+      "url": "https://book.douban.com/",
+      "frameUrl": "https://book.douban.com/"
+    },
+    {
+      "description": null,
+      "output": null,
+      "timestamp": 1751536294297,
+      "tabId": 1520015156,
+      "type": "key_press",
+      "cssSelector": "input[id=\"inp-query\"][name=\"search_text\"][placeholder=\"书名、作者、ISBN\"][autocomplete=\"off\"]",
+      "key": "Enter",
+      "xpath": "id(\"inp-query\")",
+      "elementTag": "INPUT",
+      "url": "https://book.douban.com/",
+      "frameUrl": "https://book.douban.com/"
+    },
+    {
+      "description": null,
+      "output": null,
+      "timestamp": 1751536294299,
+      "tabId": 1520015156,
+      "type": "click",
+      "cssSelector": "input[type=\"submit\"]",
+      "xpath": "id(\"db-nav-book\")/div[1]/div[1]/div[2]/form[1]/fieldset[1]/div[2]/input[1]",
+      "elementTag": "INPUT",
+      "elementText": "",
+      "url": "https://book.douban.com/",
+      "frameUrl": "https://book.douban.com/"
+    },
+    {
+      "description": null,
+      "output": null,
+      "timestamp": 1751536294938,
+      "tabId": 1520015156,
+      "type": "navigation",
+      "url": "https://search.douban.com/book/subject_search?search_text=%E4%B8%80%E5%8F%A5%E9%A1%B6%E4%B8%80%E4%B8%87%E5%8F%A5&cat=1001"
+    },
+    {
+      "description": null,
+      "output": null,
+      "timestamp": 1751536296719,
+      "tabId": 1520015156,
+      "type": "click",
+      "cssSelector": "a.title-text[href=\"https://book.douban.com/subject/36062390/\"]",
+      "xpath": "id(\"root\")/div[1]/div[2]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/a[1]",
+      "elementTag": "A",
+      "elementText": "一句顶一万句",
+      "url": "https://search.douban.com/book/subject_search?search_text=%E4%B8%80%E5%8F%A5%E9%A1%B6%E4%B8%80%E4%B8%87%E5%8F%A5&cat=1001",
+      "frameUrl": "https://search.douban.com/book/subject_search?search_text=%E4%B8%80%E5%8F%A5%E9%A1%B6%E4%B8%80%E4%B8%87%E5%8F%A5&cat=1001"
+    },
+    {
+      "description": null,
+      "output": null,
+      "timestamp": 1751536296721,
+      "tabId": 1520015156,
+      "type": "click",
+      "cssSelector": "a[href=\"javascript:;\"]",
+      "xpath": "body/div[6]/a[1]",
+      "elementTag": "A",
+      "elementText": "",
+      "url": "https://search.douban.com/book/subject_search?search_text=%E4%B8%80%E5%8F%A5%E9%A1%B6%E4%B8%80%E4%B8%87%E5%8F%A5&cat=1001",
+      "frameUrl": "https://search.douban.com/book/subject_search?search_text=%E4%B8%80%E5%8F%A5%E9%A1%B6%E4%B8%80%E4%B8%87%E5%8F%A5&cat=1001"
+    },
+    {
+      "description": null,
+      "output": null,
+      "timestamp": 1751536297777,
+      "tabId": 1520015156,
+      "type": "navigation",
+      "url": "https://book.douban.com/subject/36062390/"
+    },
+    {
+      "description": null,
+      "output": null,
+      "timestamp": 1751536302347,
+      "tabId": 1520015156,
+      "type": "click",
+      "cssSelector": "div[id=\"info\"]",
+      "xpath": "id(\"info\")",
+      "elementTag": "DIV",
+      "elementText": "作者:\n        \n            刘震云\n    \n\n    \n    \n  \n    出版社:\n      花城出版社\n    \n\n    \n    \n  \n    出品方:\n      长江新世纪\n    \n\n    \n    \n  \n\n    \n    \n  \n\n    \n    \n  \n\n    \n    \n  \n    出版年: 2022-8\n\n    \n    \n  \n",
+      "url": "https://book.douban.com/subject/36062390/",
+      "frameUrl": "https://book.douban.com/subject/36062390/"
+    },
+    {
+      "description": null,
+      "output": null,
+      "timestamp": 1751536318220,
+      "tabId": 1520015156,
+      "type": "extract_content_marked",
+      "url": "https://book.douban.com/subject/36062390/",
+      "frameUrl": "https://book.douban.com/subject/36062390/",
+      "xpath": "id(\"info\")",
+      "cssSelector": "div[id=\"info\"]",
+      "elementTag": "DIV",
+      "elementText": "作者:\n        \n            刘震云\n    \n\n    \n    \n  \n    出版社:\n      花城出版社\n    \n\n    \n    \n  \n    出品方:\n      长江新世纪\n    \n\n    \n    \n  \n\n    \n    \n  \n\n    \n    \n  \n\n    \n    \n  \n    出版年: 2022-8\n\n    \n    \n  \n",
+      "extractionRule": "提取作者、出版年和页数。",
+      "multiple": false,
+      "htmlSample": "<div id=\"info\" class=\"\">\n\n\n\n    \n    \n  \n    <span>\n      <span class=\"pl\"> 作者</span>:\n        \n            <a class=\"\" href=\"/author/4507615\">刘震云</a>\n    </span><br>\n\n    \n    \n  \n    <span class=\"pl\">出版社:</span>\n      <a href=\"https://book.douban.com/press/2536\">花城出版社</a>\n    <br>\n\n    \n    \n  \n    <span class=\"pl\">出品方:</span>\n      <a href=\"https://book.douban.com/producers/105\">长江新世纪</a>\n    <br>\n\n    \n    \n  \n\n    \n    \n  \n\n    \n    \n  \n\n    \n    \n  \n    <span class=\"pl\">出版年:</span> 2022-8<br>\n\n    \n    \n  \n    <span class=\"pl\">页数:</span> 620<br>\n\n    \n    \n  \n    <span class=\"pl\">定价:</span> 68.00元<br>\n\n    \n    \n  \n    <span class=\"pl\">装帧:</span> 精装<br>\n\n    \n    \n  \n    <span class=\"pl\">丛书:</span>&nbsp;<a href=\"https://book.douban.com/series/62387\">刘震云作品选（2022版）</a><br>\n\n    \n    \n  \n    \n      \n      <span class=\"pl\">ISBN:</span> 9787536097261<br>\n\n    \n    \n  \n\n\n</div>",
+      "selectors": [
+        {
+          "type": "css",
+          "value": "div[id=\"info\"]",
+          "priority": 1
+        },
+        {
+          "type": "xpath",
+          "value": "id(\"info\")",
+          "priority": 2
+        }
+      ],
+      "screenshot": null
+    },
+    {
+      "description": null,
+      "output": null,
+      "timestamp": 1751536333681,
+      "tabId": 1520015156,
+      "type": "extract_content_marked",
+      "url": "https://book.douban.com/subject/36062390/",
+      "frameUrl": "https://book.douban.com/subject/36062390/",
+      "xpath": "id(\"interest_sectl\")/div[1]",
+      "cssSelector": "div.rating_wrap.clearbox",
+      "elementTag": "DIV",
+      "elementText": "豆瓣评分\n    \n    \n       9.0 \n      \n      \n          \n            \n                \n                    19745人评价\n                \n            \n\n\n      \n    \n          \n            \n            \n\n    5星\n",
+      "extractionRule": "提取评分和评分人数。",
+      "multiple": false,
+      "htmlSample": "<div class=\"rating_wrap clearbox\" rel=\"v:rating\">\n    <div class=\"rating_logo\">\n            豆瓣评分\n    </div>\n    <div class=\"rating_self clearfix\" typeof=\"v:Rating\">\n      <strong class=\"ll rating_num \" property=\"v:average\"> 9.0 </strong>\n      <span property=\"v:best\" content=\"10.0\"></span>\n      <div class=\"rating_right \">\n          <div class=\"ll bigstar45\"></div>\n            <div class=\"rating_sum\">\n                <span class=\"\">\n                    <a href=\"comments\" class=\"rating_people\"><span property=\"v:votes\">19745</span>人评价</a>\n                </span>\n            </div>\n\n\n      </div>\n    </div>\n          \n            \n            \n<span class=\"stars5 starstop\" title=\"力荐\">\n    5星\n</span>\n\n            \n<div class=\"power\" style=\"width:64px\"></div>\n\n            <span class=\"rating_per\">61.7%</span>\n            <br>\n            \n            \n<span class=\"stars4 starstop\" title=\"推荐\">\n    4星\n</span>\n\n            \n<div class=\"power\" style=\"width:32px\"></div>\n\n            <span class=\"rating_per\">31.2%</span>\n            <br>\n            \n            \n<span class=\"stars3 starstop\" title=\"还行\">\n    3星\n</span>\n\n            \n<div class=\"power\" style=\"width:6px\"></div>\n\n            <span class=\"rating_per\">6.1%</span>\n            <br>\n            \n            \n<span class=\"stars2 starstop\" title=\"较差\">\n    2星\n</span>\n\n            \n<div class=\"power\" style=\"width:0px\"></div>\n\n            <span class=\"rating_per\">0.7%</span>\n            <br>\n            \n            \n<span class=\"stars1 starstop\" title=\"很差\">\n    1星\n</span>\n\n            \n<div class=\"power\" style=\"width:0px\"></div>\n\n            <span class=\"rating_per\">0.3%</span>\n            <br>\n  </div>",
+      "selectors": [
+        {
+          "type": "css",
+          "value": "div.rating_wrap.clearbox",
+          "priority": 1
+        },
+        {
+          "type": "xpath",
+          "value": "id(\"interest_sectl\")/div[1]",
+          "priority": 2
+        }
+      ],
+      "screenshot": null
+    },
+    {
+      "description": null,
+      "output": null,
+      "timestamp": 1751536337987,
+      "tabId": 1520015156,
+      "type": "scroll",
+      "scrollX": 0,
+      "scrollY": 2710,
+      "targetId": 1,
+      "url": "https://book.douban.com/"
+    },
+    {
+      "description": null,
+      "output": null,
+      "timestamp": 1751536366564,
+      "tabId": 1520015156,
+      "type": "extract_content_marked",
+      "url": "https://book.douban.com/subject/36062390/",
+      "frameUrl": "https://book.douban.com/subject/36062390/",
+      "xpath": "id(\"comments-section\")",
+      "cssSelector": "div[id=\"comments-section\"]",
+      "elementTag": "DIV",
+      "elementText": "我来说两句 \n        \n\n            \n  \n\n  \n    短评\n       · · · · · ·\n       (\n          全部 8390 条\n        ) \n\n  \n\n\n    \n    \n        \n    \n                热门\n    \n\n    \n    \n        \n  \n  \n      \n          ",
+      "extractionRule": "获取每条短评的内容、时间和评分。",
+      "multiple": false,
+      "htmlSample": "<div id=\"comments-section\">\n    <link rel=\"stylesheet\" href=\"https://img1.doubanio.com/f/vendors/d63a579a99fd372b4398731a279a1382e6eac71e/subject-comments/comments-section.css\">\n    <div class=\"mod-hd\">\n        \n\n        <a class=\"redbutt j a_show_login rr\" href=\"https://www.douban.com/register?reason=review\" rel=\"nofollow\">\n            <span> 我来说两句 </span>\n        </a>\n\n            \n  \n\n  <h2>\n    <span>短评</span>\n      &nbsp;·&nbsp;·&nbsp;·&nbsp;·&nbsp;·&nbsp;·\n      <span class=\"pl\">&nbsp;(\n          <a href=\"https://book.douban.com/subject/36062390/comments/\">全部 8390 条</a>\n        ) </span>\n\n  </h2>\n\n\n    </div>\n    <div class=\"nav-tab\">\n        \n    <div class=\"tabs-wrapper  line\">\n                <a class=\"short-comment-tabs on-tab\" href=\"https://book.douban.com/subject/36062390/comments?sort=score\" data-tab=\"score\">热门</a>\n    </div>\n\n    </div>\n    <div id=\"comment-list-wrapper\" class=\"indent\">\n        \n  \n  <div class=\"comment-list score show\" id=\"score\">\n      <ul>\n          \n  <li class=\"comment-item\" data-cid=\"4244501070\">\n    <div class=\"comment\">\n      <h3>\n        <span class=\"comment-vote\">\n            <span id=\"c-4244501070\" class=\"vote-count\">32</span>\n              <a id=\"btn-4244501070\" href=\"\" class=\"j a_show_login\" data-cid=\"4244501070\">有用</a>\n\n        </span>\n        <span class=\"comment-info\">\n          <a href=\"https://www.douban.com/people/193070850/\">和你在一起</a>\n            <span class=\"user-stars allstar50 rating\" title=\"力荐\"></span>\n          <a class=\"comment-time\" href=\"/comment/4244501070\">2024-07-16 10:34:12</a>\n          <span class=\"comment-location\">北京</span>\n        </span>\n      </h3>\n      <p class=\"comment-content\">\n      \n        <span class=\"short\">世上的事情绕来绕去，归根到底也就是个说得着和说不着。</span>\n      </p>\n        <div class=\"report-comment\" data-url=\"https://book.douban.com/subject/36062390/?comment_id=4244501070\"></div>\n    </div>\n  </li>\n\n          \n  <li class=\"comment-item\" data-cid=\"4187457967\">\n    <div class=\"comment\">\n      <h3>\n        <span class=\"comment-vote\">\n            <span id=\"c-4187457967\" class=\"vote-count\">154</span>\n              <a id=\"btn-4187457967\" href=\"\" class=\"j a_show_login\" data-cid=\"4187457967\">有用</a>\n\n        </span>\n        <span class=\"comment-info\">\n          <a href=\"https://www.douban.com/people/tieliuwudi/\">杨迪</a>\n            <span class=\"user-stars allstar50 rating\" title=\"力荐\"></span>\n          <a class=\"comment-time\" href=\"/comment/4187457967\">2024-05-13 12:27:29</a>\n          <span class=\"comment-location\">山东</span>\n        </span>\n      </h3>\n      <p class=\"comment-content\">\n      \n        <span class=\"short\">看完我真是肚子里有一万句却说不出一句，顿时想在身边也找到一个看过这本书的人来说上话。突然想起，有一位朋友看过，我去找他聊去了，他和我说得着。</span>\n      </p>\n        <div class=\"report-comment\" data-url=\"https://book.douban.com/subject/36062390/?comment_id=4187457967\"></div>\n    </div>\n  </li>\n\n          \n  <li class=\"comment-item\" data-cid=\"3572475185\">\n    <div class=\"comment\">\n      <h3>\n        <span class=\"comment-vote\">\n            <span id=\"c-3572475185\" class=\"vote-count\">95</span>\n              <a id=\"btn-3572475185\" href=\"\" class=\"j a_show_login\" data-cid=\"3572475185\">有用</a>\n\n        </span>\n        <span class=\"comment-info\">\n          <a href=\"https://www.douban.com/people/wangruihua117/\">王立冬</a>\n            <span class=\"user-stars allstar50 rating\" title=\"力荐\"></span>\n          <a class=\"comment-time\" href=\"/comment/3572475185\">2022-11-19 18:36:24</a>\n          <span class=\"comment-location\">陕西</span>\n        </span>\n      </h3>\n      <p class=\"comment-content\">\n      \n        <span class=\"short\">出延津的是杨百顺、是杨摩西、是吴摩西、是罗长礼，为巧玲；回延津的却是牛爱国，为曹青娥。出走图一个心安，归来同样求心安。可能能顶一万句的那句话就是“日子是过以后，不是过从前”。但不管是吴摩西还是牛爱国，都没放过从前。</span>\n      </p>\n        <div class=\"report-comment\" data-url=\"https://book.douban.com/subject/36062390/?comment_id=3572475185\"></div>\n    </div>\n  </li>\n\n          \n  <li class=\"comment-item\" data-cid=\"4036388162\">\n    <div class=\"comment\">\n      <h3>\n        <span class=\"comment-vote\">\n            <span id=\"c-4036388162\" class=\"vote-count\">83</span>\n              <a id=\"btn-4036388162\" href=\"\" class=\"j a_show_login\" data-cid=\"4036388162\">有用</a>\n\n        </span>\n        <span class=\"comment-info\">\n          <a href=\"https://www.douban.com/people/140119192/\">蒸蛋泡酒</a>\n            <span class=\"user-stars allstar30 rating\" title=\"还行\"></span>\n          <a class=\"comment-time\" href=\"/comment/4036388162\">2024-01-21 03:00:12</a>\n          <span class=\"comment-location\">广东</span>\n        </span>\n      </h3>\n      <p class=\"comment-content\">\n      \n        <span class=\"short\">乡土文学真是厌女的重灾区，这里面的女性人物不是恶角丑角就是工具背景板，看得我连连叹气</span>\n      </p>\n        <div class=\"report-comment\" data-url=\"https://book.douban.com/subject/36062390/?comment_id=4036388162\"></div>\n    </div>\n  </li>\n\n          \n  <li class=\"comment-item\" data-cid=\"3720680668\">\n    <div class=\"comment\">\n      <h3>\n        <span class=\"comment-vote\">\n            <span id=\"c-3720680668\" class=\"vote-count\">60</span>\n              <a id=\"btn-3720680668\" href=\"\" class=\"j a_show_login\" data-cid=\"3720680668\">有用</a>\n\n        </span>\n        <span class=\"comment-info\">\n          <a href=\"https://www.douban.com/people/215390157/\">芦涛</a>\n            <span class=\"user-stars allstar20 rating\" title=\"较差\"></span>\n          <a class=\"comment-time\" href=\"/comment/3720680668\">2023-03-14 13:33:16</a>\n          <span class=\"comment-location\">北京</span>\n        </span>\n      </h3>\n      <p class=\"comment-content\">\n      \n        <span class=\"short\">能不能不要老写这些穷逼逼的地方的婆婆妈妈的事儿</span>\n      </p>\n        <div class=\"report-comment\" data-url=\"https://book.douban.com/subject/36062390/?comment_id=3720680668\"></div>\n    </div>\n  </li>\n\n      </ul>\n  </div>\n\n        \n\n    </div>\n    <script src=\"https://img1.doubanio.com/f/vendors/6eba6f43fb7592ab783e390f654c0d6a96b1598e/subject-comments/comments-section.js\"></script>\n    <script>\n     (function () {\n            if (window.SUBJECT_COMMENTS_SECTION) {\n                // tab handler\n                SUBJECT_COMMENTS_SECTION.createTabHandler();\n                // expand handler\n                SUBJECT_COMMENTS_SECTION.createExpandHandler({\n                    root: document.getElementById('comment-list-wrapper'),\n                });\n                SUBJECT_COMMENTS_SECTION.createVoteHandler({\n                    api: '/j/comment/:id/vote',\n                    root: document.getElementById('comment-list-wrapper'),\n                    voteSelector: '.vote-comment',\n                    textSelector: '.vote-count',\n                    afterVote: function (elem) {\n                        var parentNode = elem.parentNode;\n                        var successElem = document.createElement('span');\n                        successElem.innerHTML = '已投票';\n                        parentNode.removeChild(elem);\n                        parentNode.appendChild(successElem);\n                    }\n                });\n            }\n        })()\n    </script>\n</div>",
+      "selectors": [
+        {
+          "type": "css",
+          "value": "div[id=\"comments-section\"]",
+          "priority": 1
+        },
+        {
+          "type": "xpath",
+          "value": "id(\"comments-section\")",
+          "priority": 2
+        }
+      ],
+      "screenshot": null
+    }
+  ],
+  "input_schema": []
+}

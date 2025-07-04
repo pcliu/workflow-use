@@ -11,7 +11,6 @@ from patchright.async_api import async_playwright as patchright_async_playwright
 
 # Assuming views.py is correctly located for this import path
 from workflow_use.recorder.views import (
-	HttpCustomExtractionMarkedEvent,
 	HttpRecordingStoppedEvent,
 	HttpWorkflowUpdateEvent,
 	RecorderEvent,
@@ -61,8 +60,6 @@ class RecordingService:
 		print(f'[Service] Received HTTP event: {event_data.type}')
 		if isinstance(event_data, HttpWorkflowUpdateEvent):
 			self.last_workflow_update_event = event_data
-		elif isinstance(event_data, HttpCustomExtractionMarkedEvent):
-			print(f'[Service] Extraction event payload: {event_data.payload}')
 		await self.event_queue.put(event_data)
 		return {'status': 'accepted', 'message': 'Event queued for processing'}
 
@@ -78,50 +75,12 @@ class RecordingService:
 				elif isinstance(event, HttpRecordingStoppedEvent):
 					print('[Service] RecordingStoppedEvent received, processing final workflow...')
 					await self._capture_and_signal_final_workflow('RecordingStoppedEvent')
-				elif isinstance(event, HttpCustomExtractionMarkedEvent):
-					print('[Service] CustomExtractionMarkedEvent received, processing extraction data...')
-					await self._handle_custom_extraction_event(event)
 				self.event_queue.task_done()
 		except asyncio.CancelledError:
 			print('[Service] Event processing task cancelled.')
 		except Exception as e:
 			print(f'[Service] Error in event processing task: {e}')
 
-	async def _handle_custom_extraction_event(self, event: HttpCustomExtractionMarkedEvent):
-		"""Handle custom extraction marked events by integrating them into the workflow update."""
-		# The extraction event needs to be added to the current workflow
-		if self.last_workflow_update_event:
-			# Add extraction step to the existing workflow
-			extraction_step = {
-				'type': 'extract_content_marked',
-				'timestamp': event.payload.get('timestamp'),
-				'tabId': event.payload.get('tabId'),
-				'url': event.payload.get('url'),
-				'frameUrl': event.payload.get('frameUrl'),
-				'xpath': event.payload.get('xpath'),
-				'cssSelector': event.payload.get('cssSelector'),
-				'elementTag': event.payload.get('elementTag'),
-				'elementText': event.payload.get('elementText'),
-				'extractionRule': event.payload.get('extractionRule'),
-				'multiple': event.payload.get('multiple'),
-				'htmlSample': event.payload.get('htmlSample'),
-				'selectors': event.payload.get('selectors'),
-			}
-			
-			# Insert the extraction step in the correct position based on timestamp
-			steps = self.last_workflow_update_event.payload.steps
-			insertion_index = 0
-			for i, step in enumerate(steps):
-				if hasattr(step, 'timestamp') and step.timestamp and extraction_step['timestamp']:
-					if step.timestamp > extraction_step['timestamp']:
-						insertion_index = i
-						break
-				insertion_index = i + 1
-			
-			steps.insert(insertion_index, extraction_step)
-			print(f'[Service] Added extraction step at index {insertion_index}')
-		else:
-			print('[Service] Warning: No workflow update event to add extraction to')
 
 	async def _capture_and_signal_final_workflow(self, trigger_reason: str):
 		processed_this_call = False

@@ -23,7 +23,6 @@ import {
   HttpRecordingStartedEvent,
   HttpRecordingStoppedEvent,
   HttpWorkflowUpdateEvent,
-  HttpCustomExtractionMarkedEvent,
 } from "../lib/message-bus-types";
 
 export default defineBackground(() => {
@@ -499,21 +498,8 @@ export default defineBackground(() => {
       "CUSTOM_EXTRACTION_MARKED_EVENT",
     ];
     
-    // Handle custom extraction marked events - send directly to server
-    if (message.type === "CUSTOM_EXTRACTION_MARKED_EVENT") {
-      if (!isRecordingEnabled) {
-        return false; // Don't process if recording is disabled
-      }
-      
-      const eventToSend: HttpCustomExtractionMarkedEvent = {
-        type: "CUSTOM_EXTRACTION_MARKED_EVENT",
-        timestamp: Date.now(),
-        payload: message.payload,
-      };
-      sendEventToServer(eventToSend);
-      console.log("Forwarded custom extraction event to server:", message.payload);
-      // Continue processing to also store in sessionLogs
-    }
+    // Custom extraction events are now handled through normal workflow updates
+    // No need for separate HTTP event sending
 
     if (
       message.type === "RRWEB_EVENT" ||

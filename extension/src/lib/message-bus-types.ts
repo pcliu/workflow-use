@@ -33,15 +33,8 @@ export interface HttpRecordingStoppedEvent {
 //   };
 // }
 
-export interface HttpCustomExtractionMarkedEvent {
-  type: "CUSTOM_EXTRACTION_MARKED_EVENT";
-  timestamp: number;
-  payload: any; // Contains extraction data from content script
-}
-
 export type HttpEvent =
   | HttpWorkflowUpdateEvent
   | HttpRecordingStartedEvent
-  | HttpRecordingStoppedEvent
-  | HttpCustomExtractionMarkedEvent;
+  | HttpRecordingStoppedEvent;
 // | HttpTerminateCommandEvent; // Add other event types to the union if defined

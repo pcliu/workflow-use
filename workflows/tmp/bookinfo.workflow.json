@@ -1,0 +1,142 @@
+{
+  "workflow_analysis": "The workflow involves navigating to DouBan's book page, searching for a specific book titled '\u4e00\u53e5\u9876\u4e00\u4e07\u53e5' and extracting specific information about the book including the author, publish year, pages, rating score, rating count, and short reviews. The steps involved in leaping over to the website, carrying out the search by typing and pressing 'Enter', and then navigating to specific pages to extract the necessary information. The whole process mimics a fairly straightforward data extraction task from a website after performing a search. Dynamic input such as the search term ('\u4e00\u53e5\u9876\u4e00\u4e07\u53e5') should be considered as a parameter to accommodate different search queries. The key tasks here primarily involve input operation for search, navigation to the right page, and data extraction once the target book is found. So, the input_schema will include a search_term to input different book names, authors or ISBNs. No dynamic or agentic selection is required as the targeted book information is extracted directly from a specified page layout without necessary user-driven reasoning or decision-making beyond selecting a search term.",
+  "name": "Douban Book Information Extraction",
+  "description": "Extracts basic information, rating details, and short commentaries for a book from Douban Books. Initial search is based on user input.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Navigate to Douban Books homepage.",
+      "output": null,
+      "timestamp": null,
+      "tabId": null,
+      "type": "navigation",
+      "url": "https://book.douban.com/"
+    },
+    {
+      "description": "Enter the search term into the search input.",
+      "output": null,
+      "timestamp": null,
+      "tabId": null,
+      "type": "input",
+      "cssSelector": "input[id=\"inp-query\"][name=\"search_text\"][placeholder=\"\u4e66\u540d\u3001\u4f5c\u8005\u3001ISBN\"][autocomplete=\"off\"]",
+      "value": "{search_term}",
+      "xpath": "id(\"inp-query\")",
+      "elementTag": "INPUT"
+    },
+    {
+      "description": "Submit the search term by pressing Enter.",
+      "output": null,
+      "timestamp": null,
+      "tabId": null,
+      "type": "key_press",
+      "cssSelector": "input[id=\"inp-query\"][name=\"search_text\"][placeholder=\"\u4e66\u540d\u3001\u4f5c\u8005\u3001ISBN\"][autocomplete=\"off\"]",
+      "key": "Enter",
+      "xpath": "id(\"inp-query\")",
+      "elementTag": "INPUT"
+    },
+    {
+      "description": "Select the specific book from the dynamic search results. As search results can vary, use agent to select the correct book.",
+      "output": null,
+      "type": "agent",
+      "task": "Select the book {search_term} from the search results",
+      "max_steps": 5
+    },
+    {
+      "description": "Extract basic book information like author, year, and page count.",
+      "output": null,
+      "timestamp": null,
+      "tabId": null,
+      "type": "extract_dom_content",
+      "containerXpath": "//div[@id='info']",
+      "fields": [
+        {
+          "name": "author",
+          "xpath": ".//span[contains(text(), '\u4f5c\u8005')]/following-sibling::a[1]/text()",
+          "type": "text",
+          "attribute": null
+        },
+        {
+          "name": "publish_year",
+          "xpath": ".//span[contains(text(), '\u51fa\u7248\u5e74')]/following::text()[1]",
+          "type": "text",
+          "attribute": null
+        },
+        {
+          "name": "pages",
+          "xpath": ".//span[contains(text(), '\u9875\u6570')]/following::text()[1]",
+          "type": "text",
+          "attribute": null
+        }
+      ],
+      "multiple": false,
+      "excludeXpaths": [],
+      "extractionRule": null,
+      "htmlSample": null
+    },
+    {
+      "description": "Extract the book's rating score and number of ratings.",
+      "output": null,
+      "timestamp": null,
+      "tabId": null,
+      "type": "extract_dom_content",
+      "containerXpath": ".id('interest_sectl')/div[1]",
+      "fields": [
+        {
+          "name": "rating_score",
+          "xpath": ".//strong[@class='ll rating_num ' and @property='v:average']/text()",
+          "type": "text",
+          "attribute": null
+        },
+        {
+          "name": "rating_count",
+          "xpath": ".//span[@property='v:votes']/text()",
+          "type": "text",
+          "attribute": null
+        }
+      ],
+      "multiple": false,
+      "excludeXpaths": [],
+      "extractionRule": null,
+      "htmlSample": null
+    },
+    {
+      "description": "Extract content, time, and ratings from each short review.",
+      "output": null,
+      "timestamp": null,
+      "tabId": null,
+      "type": "extract_dom_content",
+      "containerXpath": "//li[@class='comment-item']",
+      "fields": [
+        {
+          "name": "content",
+          "xpath": ".//p[@class='comment-content']/span[@class='short']/text()",
+          "type": "text",
+          "attribute": null
+        },
+        {
+          "name": "time",
+          "xpath": ".//span[@class='comment-info']/a[@class='comment-time']/text()",
+          "type": "text",
+          "attribute": null
+        },
+        {
+          "name": "rating",
+          "xpath": ".//span[contains(@class, 'user-stars')]/@title",
+          "type": "text",
+          "attribute": null
+        }
+      ],
+      "multiple": true,
+      "excludeXpaths": [],
+      "extractionRule": null,
+      "htmlSample": null
+    }
+  ],
+  "input_schema": [
+    {
+      "name": "search_term",
+      "type": "string",
+      "required": true
+    }
+  ]
+}

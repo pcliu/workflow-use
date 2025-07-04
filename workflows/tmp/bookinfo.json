@@ -1,0 +1,75 @@
+{
+  "workflow_analysis": "This workflow captures book information including author, publication year, page count, average score, and number of ratings from a book's page on Douban. It involves loading the book page URL directly and extracting specific pieces of information using XPath. As the target page URL is static, and data extraction doesn't require user interaction beyond that, the input schema is empty. The workflow is static and doesn't require any dynamic inputs from the user.",
+  "name": "DoubanBookInformationExtraction",
+  "description": "Captures and extracts book information and ratings from Douban book page.",
+  "version": "1.0",
+  "steps": [
+    {
+      "description": "Navigate to the Douban book page.",
+      "output": null,
+      "timestamp": null,
+      "tabId": null,
+      "type": "navigation",
+      "url": "https://book.douban.com/subject/36062390/"
+    },
+    {
+      "description": "Extract author, publication year, and page count from the book info section.",
+      "output": null,
+      "timestamp": null,
+      "tabId": null,
+      "type": "extract_dom_content",
+      "containerXpath": "//div[@id='info']",
+      "fields": [
+        {
+          "name": "author",
+          "xpath": ".//span[span[text()=' \u4f5c\u8005']]/a/text()",
+          "type": "text",
+          "attribute": null
+        },
+        {
+          "name": "publication_year",
+          "xpath": ".//span[text()='出版年:']/following-sibling::text()[1]",
+          "type": "text",
+          "attribute": null
+        },
+        {
+          "name": "page_count",
+          "xpath": ".//span[contains(text(), '\u9875\u6570:')]/following-sibling::text()[normalize-space()][1]",
+          "type": "text",
+          "attribute": null
+        }
+      ],
+      "multiple": false,
+      "excludeXpaths": [],
+      "extractionRule": "\u6293\u53d6\u4f5c\u8005\u3001\u51fa\u7248\u5e74\u548c\u9875\u6570\u3002",
+      "htmlSample": "<div id=\"info\" class=\"\">\n\n\n\n    \n    \n  \n    <span>\n      <span class=\"pl\"> \u4f5c\u8005</span>:\n        \n            <a class=\"\" href=\"/author/4507615\">\u5218\u9707\u4e91</a>\n    </span><br>\n\n    \n    \n  \n    <span class=\"pl\">\u51fa\u7248\u793e:</span>\n      <a href=\"https://book.douban.com/press/2536\">\u82b1\u57ce\u51fa\u7248\u793e</a>\n    <br>\n\n    \n    \n  \n    <span class=\"pl\">\u51fa\u54c1\u65b9:</span>\n      <a href=\"https://book.douban.com/producers/105\">\u957f\u6c5f\u65b0\u4e16\u7eaa</a>\n    <br>\n\n    \n    \n  \n\n    \n    \n  \n\n    \n    \n  \n\n    \n    \n  \n    <span class=\"pl\">\u51fa\u7248\u5e74:</span> 2022-8<br>\n\n    \n    \n  \n    <span class=\"pl\">\u9875\u6570:</span> 620<br>\n\n    \n    \n  \n    <span class=\"pl\">\u5b9a\u4ef7:</span> 68.00\u5143<br>\n\n    \n    \n  \n    <span class=\"pl\">\u88c5\u5e27:</span> \u7cbe\u88c5<br>\n\n    \n    \n  \n    <span class=\"pl\">\u4e1b\u4e66:</span>&nbsp;<a href=\"https://book.douban.com/series/62387\">\u5218\u9707\u4e91\u4f5c\u54c1\u9009\uff082022\u7248\uff09</a><br>\n\n    \n    \n  \n    \n      \n      <span class=\"pl\">ISBN:</span> 9787536097261<br>\n\n    \n    \n  \n\n\n</div>"
+    },
+    {
+      "description": "Extract score and number of ratings from the page.",
+      "output": null,
+      "timestamp": null,
+      "tabId": null,
+      "type": "extract_dom_content",
+      "containerXpath": "//div[@class='rating_wrap clearbox']",
+      "fields": [
+        {
+          "name": "score",
+          "xpath": ".//strong[contains(@class, 'rating_num')]/text()",
+          "type": "text",
+          "attribute": null
+        },
+        {
+          "name": "number_of_ratings",
+          "xpath": ".//span[@property='v:votes']/text()",
+          "type": "text",
+          "attribute": null
+        }
+      ],
+      "multiple": false,
+      "excludeXpaths": [],
+      "extractionRule": "\u6293\u53d6\u8bc4\u5206\u548c\u8bc4\u5206\u4eba\u6570\u3002",
+      "htmlSample": "<div class=\"rating_wrap clearbox\" rel=\"v:rating\">\n    <div class=\"rating_logo\">\n            \u8c46\u74e3\u8bc4\u5206\n    </div>\n    <div class=\"rating_self clearfix\" typeof=\"v:Rating\">\n      <strong class=\"ll rating_num \" property=\"v:average\"> 9.0 </strong>\n      <span property=\"v:best\" content=\"10.0\"></span>\n      <div class=\"rating_right \">\n          <div class=\"ll bigstar45\"></div>\n            <div class=\"rating_sum\">\n                <span class=\"\">\n                    <a href=\"comments\" class=\"rating_people\"><span property=\"v:votes\">19727</span>\u4eba\u8bc4\u4ef7</a>\n                </span>\n            </div>\n\n\n      </div>\n    </div>\n          \n            \n            \n<span class=\"stars5 starstop\" title=\"\u529b\u8350\">\n    5\u661f\n</span>\n\n            \n<div class=\"power\" style=\"width:64px\"></div>\n\n            <span class=\"rating_per\">61.7%</span>\n            <br>\n            \n            \n<span class=\"stars4 starstop\" title=\"\u63a8\u8350\">\n    4\u661f\n</span>\n\n            \n<div class=\"power\" style=\"width:32px\"></div>\n\n            <span class=\"rating_per\">31.2%</span>\n            <br>\n            \n            \n<span class=\"stars3 starstop\" title=\"\u8fd8\u884c\">\n    3\u661f\n</span>\n\n            \n<div class=\"power\" style=\"width:6px\"></div>\n\n            <span class=\"rating_per\">6.2%</span>\n            <br>\n            \n            \n<span class=\"stars2 starstop\" title=\"\u8f83\u5dee\">\n    2\u661f\n</span>\n\n            \n<div class=\"power\" style=\"width:0px\"></div>\n\n            <span class=\"rating_per\">0.7%</span>\n            <br>\n            \n            \n<span class=\"stars1 starstop\" title=\"\u5f88\u5dee\">\n    1\u661f\n</span>\n\n            \n<div class=\"power\" style=\"width:0px\"></div>\n\n            <span class=\"rating_per\">0.3%</span>\n            <br>\n  </div>"
+    }
+  ],
+  "input_schema": []
+}
