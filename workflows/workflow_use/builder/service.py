@@ -34,22 +34,27 @@ class BuilderService:
 		if llm is None:
 			raise ValueError('A BaseChatModel instance must be provided.')
 
-		# Store the original LLM for general use
-		self.model = llm
-		
-		# Configure the LLM to return structured output based on the Pydantic model
-		try:
-			# Specify method="function_calling" for better compatibility
-			self.llm_structured = llm.with_structured_output(WorkflowDefinitionSchema, method='function_calling')
-		except NotImplementedError:
-			logger.warning('LLM does not support structured output natively. Falling back.')
-			# Basic LLM call if structured output is not supported
-			# Output parsing will be handled manually later
-			self.llm_structured = llm  # Store the original llm
-
+		# Store LLM with structured output configuration
+		self.llm = self._configure_structured_llm(llm)
 		self.prompt_template = WORKFLOW_BUILDER_PROMPT_TEMPLATE
-		self.actions_markdown = self._get_available_actions_markdown()
+		self._actions_markdown_cache = None  # Lazy load actions metadata
 		logger.info('BuilderService initialized.')
+
+	def _configure_structured_llm(self, llm: BaseChatModel) -> BaseChatModel:
+		"""Configure LLM for structured output, falling back gracefully."""
+		try:
+			# Use function calling for better compatibility
+			return llm.with_structured_output(WorkflowDefinitionSchema, method='function_calling')
+		except NotImplementedError:
+			logger.warning('LLM does not support structured output natively. Using fallback.')
+			return llm
+
+	@property
+	def actions_markdown(self) -> str:
+		"""Cached actions metadata to avoid repeated WorkflowController instantiation."""
+		if self._actions_markdown_cache is None:
+			self._actions_markdown_cache = self._get_available_actions_markdown()
+		return self._actions_markdown_cache
 
 	def _get_available_actions_markdown(self) -> str:
 		"""Return a markdown list of available actions and their schema."""
@@ -184,13 +189,9 @@ class BuilderService:
 			if not response_text:
 				raise ValueError("LLM returned empty response")
 			
-			# Remove markdown code blocks if present
-			if response_text.startswith('```json'):
-				response_text = response_text[7:-3].strip()
-			elif response_text.startswith('```'):
-				response_text = response_text[3:-3].strip()
-			
-			refined_extraction = json.loads(response_text)
+			# Use the common JSON extraction utility
+			clean_response = self._extract_json_from_response(response_text)
+			refined_extraction = json.loads(clean_response)
 			logger.info(f"LLM refined extraction: {refined_extraction}")
 			
 			# Validate and fix xpath selectors
@@ -294,26 +295,66 @@ class BuilderService:
 		logger.info(f"Navigation filtering: {len(steps)} -> {len(filtered_steps)} steps")
 		return filtered_steps
 
-	def _parse_llm_output_to_workflow(self, llm_content: str) -> WorkflowDefinitionSchema:
-		"""Attempts to parse the LLM string output into a WorkflowDefinitionSchema."""
-		logger.debug(f'Raw LLM Output:\n{llm_content}')
-		content_to_parse = llm_content
-
-		# Heuristic cleanup: Extract JSON from markdown code blocks
-		if '```json' in content_to_parse:
-			match = re.search(r'```json\s*([\s\S]*?)\s*```', content_to_parse, re.DOTALL)
+	def _extract_json_from_response(self, response_text: str) -> str:
+		"""Extract JSON content from LLM response with markdown cleanup."""
+		content = response_text.strip()
+		
+		# Extract JSON from markdown code blocks
+		if '```json' in content:
+			match = re.search(r'```json\s*([\s\S]*?)\s*```', content, re.DOTALL)
 			if match:
-				content_to_parse = match.group(1).strip()
 				logger.debug('Extracted JSON from ```json block.')
-		elif content_to_parse.strip().startswith('{') and content_to_parse.strip().endswith('}'):
-			# Assume it's already JSON if it looks like it
-			content_to_parse = content_to_parse.strip()
+				return match.group(1).strip()
+		
+		# Extract from generic code blocks
+		if '```' in content:
+			match = re.search(r'```\s*([\s\S]*?)\s*```', content, re.DOTALL)
+			if match:
+				potential_json = match.group(1).strip()
+				if potential_json.startswith('{') and potential_json.endswith('}'):
+					logger.debug('Extracted JSON from generic code block.')
+					return potential_json
+		
+		# Assume raw JSON if it looks like it
+		if content.startswith('{') and content.endswith('}'):
 			logger.debug('Assuming raw output is JSON.')
-		else:
-			logger.warning('Could not reliably extract JSON from LLM output, attempting parse anyway.')
+			return content
+			
+		logger.warning('Could not reliably extract JSON from LLM output.')
+		return content
 
+	async def _invoke_llm_with_fallback(self, messages: list) -> WorkflowDefinitionSchema:
+		"""Unified LLM invocation with structured output and fallback parsing."""
 		try:
-			# Try parsing directly first (might work with structured output)
+			# Try structured output first
+			llm_response = await self.llm.ainvoke([HumanMessage(content=cast(Any, messages))])
+			
+			# Check if we got a structured response
+			if isinstance(llm_response, WorkflowDefinitionSchema):
+				return llm_response
+			
+			# Extract content and parse manually
+			content = getattr(llm_response, 'content', str(llm_response))
+			return self._parse_llm_output_to_workflow(str(content))
+			
+		except OutputParserException as ope:
+			logger.error(f'LLM output parsing failed: {ope}')
+			# Try to parse the raw output as fallback
+			raw_output = getattr(ope, 'llm_output', str(ope))
+			logger.info('Attempting to parse raw output as fallback...')
+			return self._parse_llm_output_to_workflow(raw_output)
+			
+		except Exception as e:
+			logger.exception(f'LLM invocation failed: {e}')
+			raise
+
+	def _parse_llm_output_to_workflow(self, llm_content: str) -> WorkflowDefinitionSchema:
+		"""Parse LLM string output into WorkflowDefinitionSchema."""
+		logger.debug(f'Raw LLM Output:\n{llm_content}')
+		
+		content_to_parse = self._extract_json_from_response(llm_content)
+		
+		try:
 			workflow_data = WorkflowDefinitionSchema.model_validate_json(content_to_parse)
 			logger.info('Successfully parsed LLM output into WorkflowDefinitionSchema.')
 			return workflow_data
@@ -424,39 +465,8 @@ class BuilderService:
 
 		logger.info(f'Prepared {len(vision_messages)} total message parts, including {images_used} images.')
 
-		# Invoke the LLM (structured output preferred)
-		try:
-			# Invoke the LLM (structured output preferred)
-			# Need to handle cases where structured output isn't truly supported
-			if hasattr(self.llm_structured, 'output_schema'):  # Check if it seems like structured output model
-				llm_response = await self.llm_structured.ainvoke([HumanMessage(content=cast(Any, vision_messages))])
-				# If structured output worked, llm_response is the Pydantic object
-				if isinstance(llm_response, WorkflowDefinitionSchema):
-					workflow_data = llm_response
-				else:
-					# It might have returned a message or dict, try parsing its content
-					content = getattr(llm_response, 'content', str(llm_response))
-					workflow_data = self._parse_llm_output_to_workflow(str(content))
-			else:
-				# Fallback to basic LLM call and manual parsing
-				llm_response = await self.llm_structured.ainvoke([HumanMessage(content=cast(Any, vision_messages))])
-				llm_content = str(getattr(llm_response, 'content', llm_response))  # Get string content
-				workflow_data = self._parse_llm_output_to_workflow(llm_content)
-
-		except OutputParserException as ope:
-			logger.error(f'LLM output parsing failed (OutputParserException): {ope}')
-			# Try to parse the raw output as a fallback
-			raw_output = getattr(ope, 'llm_output', str(ope))
-			logger.info('Attempting to parse raw output as fallback...')
-			try:
-				workflow_data = self._parse_llm_output_to_workflow(raw_output)
-			except ValueError as ve_fallback:
-				raise ValueError(
-					f'LLM structured output failed, and fallback parsing also failed. Error: {ve_fallback}'
-				) from ve_fallback
-		except Exception as e:
-			logger.exception(f'An error occurred during LLM invocation or processing: {e}')
-			raise  # Re-raise other unexpected errors
+		# Simplified LLM invocation with unified error handling
+		workflow_data = await self._invoke_llm_with_fallback(vision_messages)
 
 		# Return the workflow data object directly
 		return workflow_data
