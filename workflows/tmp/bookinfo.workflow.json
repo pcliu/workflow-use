@@ -19,7 +19,7 @@
       "tabId": null,
       "type": "input",
       "cssSelector": "input[id=\"inp-query\"][name=\"search_text\"][placeholder=\"\u4e66\u540d\u3001\u4f5c\u8005\u3001ISBN\"][autocomplete=\"off\"]",
-      "value": "{search_term}",
+      "value": "{book_title}",
       "xpath": null,
       "elementTag": null
     },
@@ -35,15 +35,10 @@
       "elementTag": null
     },
     {
-      "description": "Select the specific book from the search results.",
-      "output": null,
-      "timestamp": null,
-      "tabId": null,
+      "description": "Select the first book from search results (most relevant).",
       "type": "click",
-      "cssSelector": "a.title-text[href=\"https://book.douban.com/subject/36062390/\"]",
-      "xpath": null,
-      "elementTag": null,
-      "elementText": null
+      "cssSelector": "non-existent-selector-to-force-xpath-fallback",
+      "xpath": "(.//div[@class='title']//a[contains(@href,'/subject/')])[1]"
     },
     {
       "description": "Extract the author's name, publisher, publication year, and number of pages.",
@@ -144,7 +139,7 @@
   ],
   "input_schema": [
     {
-      "name": "search_term",
+      "name": "book_title",
       "type": "string",
       "required": true
     }

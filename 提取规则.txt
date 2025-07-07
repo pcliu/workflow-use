@@ -1,0 +1,28 @@
+选择器优先级总结
+
+  1. DOM提取操作 (extract_dom_content) - XPath优先
+
+  容器选择：
+  1. Priority 1: containerXpath (如果存在)
+  2. Fallback: containerSelector (CSS)
+
+  字段提取： (_find_field_element_with_fallback)
+  1. Strategy 1: field.xpath (如果存在)
+  2. Strategy 2: field.selector (CSS)
+  3. Strategy 3: 基于字段名的fallback选择器
+
+  2. 其他操作类型 (click, input, key_press) - CSS Selector优先
+
+  选择策略： (get_best_element_handle)
+  1. Primary: params.cssSelector
+  2. Fallback: CSS选择器的稳定化版本
+  3. Last Resort: params.xpath (仅在所有CSS fallback都失败后)
+
+  工作流硬编码问题的影响
+
+  这解释了为什么bookinfo工作流的第4步失败：
+  - 第4步是click操作，使用CSS selector优先
+  - 硬编码的a.title-text[href="https://book.douban.com/subject/36062390/"]包含具体书籍ID
+  - 当搜索不同书籍时，这个选择器无法匹配到实际结果
+
+  而第5-7步的DOM提取成功，因为它们使用的是更通用的XPath选择器，不依赖具体的书籍ID。
