@@ -209,6 +209,9 @@ class Workflow:
 			failed_value = f"{description_prefix}Select option: '{step_resolved.selectedText}' in dropdown."
 		elif isinstance(step_resolved, KeyPressStep):
 			failed_value = f"{description_prefix}Press key: '{step_resolved.key}'"
+		elif isinstance(step_resolved, DOMContentExtractionStep):
+			rule = step_resolved.extractionRule or "the fields defined in the step"
+			failed_value = f"{description_prefix}Extract structured data based on the rule: '{rule}'"
 		elif isinstance(step_resolved, ScrollStep):
 			failed_value = f'{description_prefix}Scroll to position: (x={step_resolved.scrollX}, y={step_resolved.scrollY})'
 		else:

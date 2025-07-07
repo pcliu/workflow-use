@@ -232,14 +232,13 @@ class WorkflowController(Controller):
 		)
 		async def extract_dom_content(
 			params: DOMExtractionAction, 
-			browser_session: Browser, 
-			page_extraction_llm: BaseChatModel
+			browser_session: Browser
 		) -> ActionResult:
 			"""Extract content from DOM elements using selectors with fallback strategies."""
 			page = await browser_session.get_current_page()
 			
 			try:
-				extracted_data = await self._extract_dom_elements(page, params, page_extraction_llm)
+				extracted_data = await self._extract_dom_elements(page, params)
 				
 				msg = f'🎯  Extracted DOM content: {extracted_data}'
 				logger.info(msg)
@@ -250,7 +249,7 @@ class WorkflowController(Controller):
 				logger.error(error_msg)
 				raise Exception(error_msg)
 
-	async def _extract_dom_elements(self, page, params: DOMExtractionAction, llm: BaseChatModel):
+	async def _extract_dom_elements(self, page, params: DOMExtractionAction):
 		"""Core DOM extraction logic with structured field extraction supporting both XPath and CSS."""
 		results = []
 		
@@ -526,4 +525,3 @@ class WorkflowController(Controller):
 			full_error_msg = f'{error_msg}. Original selector: {truncate_selector(original_selector)}. Error: {str(e)}'
 			logger.error(full_error_msg)
 			raise Exception(full_error_msg)
-
