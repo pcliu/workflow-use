@@ -10,9 +10,27 @@ def truncate_selector(selector: str, max_length: int = 35) -> str:
 
 
 async def get_best_element_handle(page, selector, params=None, timeout_ms=500):
-	"""Find element using stability-ranked selector strategies."""
+	"""Find element using stability-ranked selector strategies with XPath priority."""
 	original_selector = selector
 
+	# Try XPath first if available
+	if params and getattr(params, 'xpath', None):
+		xpath = params.xpath
+		try:
+			# Generate stable XPath alternatives
+			xpath_alternatives = [xpath] + generate_stable_xpaths(xpath, params)
+
+			for try_xpath in xpath_alternatives:
+				xpath_selector = f'xpath={try_xpath}'
+				logger.info(f'Trying XPath: {truncate_selector(xpath_selector)}')
+				locator = page.locator(xpath_selector)
+				await locator.wait_for(state='visible', timeout=timeout_ms)
+				logger.info(f'Found element with XPath: {truncate_selector(xpath_selector)}')
+				return locator, xpath_selector
+		except Exception as e:
+			logger.error(f'All XPaths failed with error: {e}')
+
+	# Fallback to CSS selectors if XPath fails or not available
 	# Generate stability-ranked fallback selectors
 	fallbacks = generate_stable_selectors(selector, params)
 
@@ -28,22 +46,6 @@ async def get_best_element_handle(page, selector, params=None, timeout_ms=500):
 			return locator, try_selector
 		except Exception as e:
 			logger.error(f'Selector failed: {truncate_selector(try_selector)} with error: {e}')
-
-	# Try XPath as last resort
-	if params and getattr(params, 'xpath', None):
-		xpath = params.xpath
-		try:
-			# Generate stable XPath alternatives
-			xpath_alternatives = [xpath] + generate_stable_xpaths(xpath, params)
-
-			for try_xpath in xpath_alternatives:
-				xpath_selector = f'xpath={try_xpath}'
-				logger.info(f'Trying XPath: {truncate_selector(xpath_selector)}')
-				locator = page.locator(xpath_selector)
-				await locator.wait_for(state='visible', timeout=timeout_ms)
-				return locator, xpath_selector
-		except Exception as e:
-			logger.error(f'All XPaths failed with error: {e}')
 
 	raise Exception(f'Failed to find element. Original: {original_selector}')
 
