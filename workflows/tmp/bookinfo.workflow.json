@@ -15,7 +15,7 @@
     {
       "description": "Select the first book from search results (most relevant).",
       "type": "click",
-      "cssSelector": "non-existent-selector-to-force-xpath-fallback",
+      "cssSelector": ".title a[href*='/subject/']",
       "xpath": "(.//div[@class='title']//a[contains(@href,'/subject/')])[1]"
     },
     {
@@ -62,7 +62,7 @@
       "timestamp": null,
       "tabId": null,
       "type": "extract_dom_content",
-     "containerXpath": "id(\"link-report\")//div[@class=\"intro\"]",
+      "containerXpath": "id(\"link-report\")//div[@class=\"intro\"]",
       "fields": [
         {
           "name": "content",
@@ -101,6 +101,27 @@
       "excludeXpaths": [],
       "extractionRule": null,
       "htmlSample": null
+    },
+    
+    {
+      "description": "Extract online reading channels from the Douban book page.",
+      "output": null,
+      "timestamp": 1751944688931,
+      "tabId": 1520016137,
+      "type": "extract_dom_content",
+      "containerXpath": "//div[@class='gray_ad online-partner']//div[@class='vendor-info']",
+      "fields": [
+        {
+          "name": "channel_name",
+          "xpath": ".//a[contains(@class,'vendor-name')]/text()",
+          "type": "text",
+          "attribute": null
+        }
+      ],
+      "multiple": true,
+      "excludeXpaths": [],
+      "extractionRule": "\u63d0\u53d6\u5728\u7ebf\u8bd5\u8bfb\u7684\u6e20\u9053",
+      "htmlSample": "<div class=\"gray_ad online-partner\">\n    <div class=\"online-type\">\n      <h2>\n        \u5728\u7ebf\u8bd5\u8bfb\n        \uff1a\n      </h2>\n\n        <div class=\"online-read-or-audio\">\n          <div class=\"vendor-info\">\n            <img class=\"vendor-icon\" src=\"https://img1.doubanio.com/f/rohirrim/161387ce451872cbf51fcb288cd5ffd1dcd89705/website/static/pics/icon/icon_dedao.png\">\n            <a class=\"vendor-name impression_track_mod_buyinfo\" target=\"_blank\" href=\"https://www.dedao.cn/ebook/reader?id=xGM6Evn5byxq2PnXBz71AjZaol6R8WJrlGLWOKpGkd4gmMLEJrYNQe9VvD8P4jLk&amp;source=douban\" data-track=\"https://frodo.douban.com/rohirrim/tracking/impression?subject_id=37103197&amp;isbn=7542687034&amp;source=dedao&amp;user_id=&amp;bid=DyF77IJ6pG4&amp;platform=pc&amp;location=vender_subject_text\" onclick=\"track('https://frodo.douban.com/rohirrim/tracking/click?subject_id=37103197&amp;isbn=7542687034&amp;source=dedao&amp;user_id=&amp;bid=DyF77IJ6pG4&amp;platform=pc&amp;location=vender_subject_text')\">\n              \u5f97\u5230\n            </a>\n          </div>\n          <a class=\"vendor-link\" target=\"_blank\" href=\"https://www.dedao.cn/ebook/reader?id=xGM6Evn5byxq2PnXBz71AjZaol6R8WJrlGLWOKpGkd4gmMLEJrYNQe9VvD8P4jLk&amp;source=douban\" data-track=\"https://frodo.douban.com/rohirrim/tracking/impression?subject_id=37103197&amp;isbn=7542687034&amp;source=dedao&amp;user_id=&amp;bid=DyF77IJ6pG4&amp;platform=pc&amp;location=vender_subject_text\" onclick=\"track('https://frodo.douban.com/rohirrim/tracking/click?subject_id=37103197&amp;isbn=7542687034&amp;source=dedao&amp;user_id=&amp;bid=DyF77IJ6pG4&amp;platform=pc&amp;location=vender_subject_text')\">\n            \u5728\u7ebf\u8bd5\u8bfb\n          </a>\n        </div>\n    </div>\n  </div>"
     },
     {
       "description": "Extract user comments, comment dates, and ratings per comment.",
