@@ -10,29 +10,7 @@
       "timestamp": null,
       "tabId": null,
       "type": "navigation",
-      "url": "https://book.douban.com/"
-    },
-    {
-      "description": "Input the book title to search for.",
-      "output": null,
-      "timestamp": null,
-      "tabId": null,
-      "type": "input",
-      "cssSelector": "input[id=\"inp-query\"][name=\"search_text\"][placeholder=\"\u4e66\u540d\u3001\u4f5c\u8005\u3001ISBN\"][autocomplete=\"off\"]",
-      "value": "{book_title}",
-      "xpath": null,
-      "elementTag": null
-    },
-    {
-      "description": "Press enter to submit the search.",
-      "output": null,
-      "timestamp": null,
-      "tabId": null,
-      "type": "key_press",
-      "cssSelector": "input[id=\"inp-query\"][name=\"search_text\"][placeholder=\"\u4e66\u540d\u3001\u4f5c\u8005\u3001ISBN\"][autocomplete=\"off\"]",
-      "key": "Enter",
-      "xpath": null,
-      "elementTag": null
+      "url": "https://search.douban.com/book/subject_search?search_text={book_title}&cat=1001"
     },
     {
       "description": "Select the first book from search results (most relevant).",
@@ -77,6 +55,26 @@
       "excludeXpaths": [],
       "extractionRule": null,
       "htmlSample": null
+    },
+    {
+      "description": "Extract the full content of the book's description from the page.",
+      "output": null,
+      "timestamp": null,
+      "tabId": null,
+      "type": "extract_dom_content",
+     "containerXpath": "id(\"link-report\")//div[@class=\"intro\"]",
+      "fields": [
+        {
+          "name": "content",
+          "xpath": ".",
+          "type": "text",
+          "attribute": null
+        }
+      ],
+      "multiple": false,
+      "excludeXpaths": [],
+      "extractionRule": "\u83b7\u53d6\u6240\u6709\u7684\u5185\u5bb9\u7b80\u4ecb",
+      "htmlSample": null 
     },
     {
       "description": "Extract average rating and number of ratings.",
